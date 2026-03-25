@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
+import { Sparkles, BarChart3, Users, Wallet } from "lucide-react";
 
 const stats = [
-  { value: "$2.4M", label: "Total Volume" },
-  { value: "847", label: "Active Markets" },
-  { value: "12.5K", label: "Total Predictions" },
-  { value: "234", label: "Current Creators" },
+  { value: "$2.4M", label: "Total Volume", icon: Wallet },
+  { value: "847", label: "Active Users", icon: Users },
+  { value: "12.5K", label: "Predictions Made", icon: BarChart3 },
+  { value: "234", label: "Markets Created", icon: Sparkles },
 ];
 
 export default function StatisticsSection() {
@@ -34,9 +35,10 @@ export default function StatisticsSection() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: index * 0.08 }}
               viewport={{ once: true }}
-              className="bg-gray-950/60 border border-[#1e2d45] rounded-xl px-8 py-7 flex flex-col min-h-[140px] justify-between"
+              className="bg-gray-950/60 border border-[#1e2d45] rounded-xl px-8 py-7 flex flex-col min-h-[140px] justify-center items-center text-center gap-2"
             >
-              <div className="text-3xl font-bold text-white">{stat.value}</div>
+              <stat.icon className="w-6 h-6 text-blue-400" />
+              <div className="text-3xl font-bold text-blue-400">{stat.value}</div>
               <div className="text-gray-400 text-sm">{stat.label}</div>
             </motion.div>
           ))}
