@@ -52,17 +52,20 @@ pub fn refund(env: &Env, recipient: &Address, amount: i128) -> Result<(), Insigh
 ///
 /// This is semantically distinct from `refund` (used for market cancellation),
 /// but uses the same escrow transfer path from contract balance to recipient.
-pub fn release_payout(
-    env: &Env,
-    predictor: &Address,
-    amount: i128,
-) -> Result<(), InsightArenaError> {
+pub fn release_payout(env: &Env, to: &Address, amount: i128) -> Result<(), InsightArenaError> {
+    if amount <= 0 {
+        return Err(InsightArenaError::InvalidInput);
+    }
+
     let cfg = config::get_config(env)?;
-    token::Client::new(env, &cfg.xlm_token).transfer(
-        &env.current_contract_address(),
-        predictor,
-        &amount,
-    );
+    let client = token::Client::new(env, &cfg.xlm_token);
+    let contract = env.current_contract_address();
+
+    if client.balance(&contract) < amount {
+        return Err(InsightArenaError::EscrowEmpty);
+    }
+
+    client.transfer(&contract, to, &amount);
     Ok(())
 }
 
@@ -74,7 +77,7 @@ mod escrow_tests {
 
     use crate::{InsightArenaContract, InsightArenaContractClient, InsightArenaError};
 
-    use super::lock_stake;
+    use super::{lock_stake, release_payout};
 
     fn register_token(env: &Env) -> Address {
         let token_admin = Address::generate(env);
@@ -157,5 +160,53 @@ mod escrow_tests {
         env.as_contract(&client.address, || {
             let _ = lock_stake(&env, &predictor, 10_000_000_i128);
         });
+    }
+
+    #[test]
+    fn test_release_payout_success() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let xlm_token = register_token(&env);
+        let client = deploy(&env, &xlm_token);
+        let recipient = Address::generate(&env);
+        let payout = 20_000_000_i128;
+
+        fund(&env, &xlm_token, &client.address, payout);
+
+        let token = TokenClient::new(&env, &xlm_token);
+        assert_eq!(token.balance(&client.address), payout);
+        assert_eq!(token.balance(&recipient), 0);
+
+        let result = env.as_contract(&client.address, || release_payout(&env, &recipient, payout));
+        assert_eq!(result, Ok(()));
+
+        assert_eq!(token.balance(&client.address), 0);
+        assert_eq!(token.balance(&recipient), payout);
+    }
+
+    #[test]
+    fn test_release_payout_contract_insolvent() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let xlm_token = register_token(&env);
+        let client = deploy(&env, &xlm_token);
+        let recipient = Address::generate(&env);
+
+        let result = env.as_contract(&client.address, || {
+            release_payout(&env, &recipient, 10_000_000_i128)
+        });
+        assert_eq!(result, Err(InsightArenaError::EscrowEmpty));
+    }
+
+    #[test]
+    fn test_release_payout_zero_value() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let xlm_token = register_token(&env);
+        let client = deploy(&env, &xlm_token);
+        let recipient = Address::generate(&env);
+
+        let result = env.as_contract(&client.address, || release_payout(&env, &recipient, 0));
+        assert_eq!(result, Err(InsightArenaError::InvalidInput));
     }
 }
