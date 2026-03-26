@@ -242,7 +242,6 @@ impl InsightArenaContract {
         escrow::get_treasury_balance(&env)
     }
 
-<<<<<<< feat/generate-invite-code
     // ── Invite ────────────────────────────────────────────────────────────────
 
     /// Generate a unique 8-character invite code for a private market.
@@ -258,7 +257,8 @@ impl InsightArenaContract {
         expires_in_seconds: u64,
     ) -> Result<Symbol, InsightArenaError> {
         invite::generate_invite_code(env, creator, market_id, max_uses, expires_in_seconds)
-=======
+    }
+
     // ── Season / Leaderboard ────────────────────────────────────────────────
 
     pub fn create_season(
@@ -314,7 +314,6 @@ impl InsightArenaContract {
         new_season_id: u32,
     ) -> Result<u32, InsightArenaError> {
         season::reset_season_points(&env, admin, new_season_id)
->>>>>>> main
     }
 }
 
