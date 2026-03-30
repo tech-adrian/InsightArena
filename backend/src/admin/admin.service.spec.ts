@@ -6,10 +6,11 @@ import {
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Comment } from '../markets/entities/comment.entity';
-import { ActivityLog } from '../analytics/entities/activity-log.entity';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { ActivityLog } from '../analytics/entities/activity-log.entity';
+import { Role } from '../common/enums/role.enum';
 import { Competition } from '../competitions/entities/competition.entity';
+import { Comment } from '../markets/entities/comment.entity';
 import { Market } from '../markets/entities/market.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Prediction } from '../predictions/entities/prediction.entity';
@@ -17,7 +18,6 @@ import { SorobanService } from '../soroban/soroban.service';
 import { User } from '../users/entities/user.entity';
 import { AdminService } from './admin.service';
 import { ResolveMarketDto } from './dto/resolve-market.dto';
-import { Role } from '../common/enums/role.enum';
 
 const mockRepo = () => ({
   findOne: jest.fn(),
@@ -205,6 +205,181 @@ describe('AdminService.adminResolveMarket', () => {
         won: false,
       }),
     );
+  });
+});
+
+describe('AdminService.featureMarket', () => {
+  let service: AdminService;
+  let marketsRepo: ReturnType<typeof mockRepo>;
+  let analyticsService: jest.Mocked<Pick<AnalyticsService, 'logActivity'>>;
+
+  const adminId = 'admin-1';
+
+  const makeMarket = (overrides: Partial<Market> = {}): Market =>
+    ({
+      id: 'market-1',
+      on_chain_market_id: 'on-chain-1',
+      title: 'Test Market',
+      is_featured: false,
+      featured_at: null,
+      ...overrides,
+    }) as Market;
+
+  beforeEach(async () => {
+    marketsRepo = mockRepo();
+    analyticsService = { logActivity: jest.fn().mockResolvedValue({}) };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdminService,
+        { provide: getRepositoryToken(User), useValue: mockRepo() },
+        { provide: getRepositoryToken(Market), useValue: marketsRepo },
+        { provide: getRepositoryToken(Comment), useValue: mockRepo() },
+        { provide: getRepositoryToken(Prediction), useValue: mockRepo() },
+        { provide: getRepositoryToken(Competition), useValue: mockRepo() },
+        { provide: getRepositoryToken(ActivityLog), useValue: mockRepo() },
+        { provide: AnalyticsService, useValue: analyticsService },
+        { provide: NotificationsService, useValue: { create: jest.fn() } },
+        { provide: SorobanService, useValue: { resolveMarket: jest.fn() } },
+      ],
+    }).compile();
+
+    service = module.get<AdminService>(AdminService);
+  });
+
+  it('throws NotFoundException when market does not exist', async () => {
+    marketsRepo.findOne.mockResolvedValue(null);
+
+    await expect(service.featureMarket('bad-id', adminId)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('throws ConflictException when market is already featured', async () => {
+    marketsRepo.findOne.mockResolvedValue(makeMarket({ is_featured: true }));
+
+    await expect(service.featureMarket('market-1', adminId)).rejects.toThrow(
+      ConflictException,
+    );
+  });
+
+  it('features market and logs admin action', async () => {
+    const market = makeMarket();
+    const featuredMarket = {
+      ...market,
+      is_featured: true,
+      featured_at: new Date(),
+    };
+
+    marketsRepo.findOne.mockResolvedValue(market);
+    marketsRepo.save.mockResolvedValue(featuredMarket);
+
+    const result = await service.featureMarket('market-1', adminId);
+
+    expect(marketsRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        is_featured: true,
+        featured_at: expect.any(Date),
+      }),
+    );
+    expect(analyticsService.logActivity).toHaveBeenCalledWith(
+      adminId,
+      'MARKET_FEATURED_BY_ADMIN',
+      expect.objectContaining({
+        market_id: 'market-1',
+        featured_at: expect.any(Date),
+      }),
+    );
+    expect(result.is_featured).toBe(true);
+    expect(result.featured_at).toBeInstanceOf(Date);
+    expect(result.featured_at).not.toBeNull();
+  });
+});
+
+describe('AdminService.unfeatureMarket', () => {
+  let service: AdminService;
+  let marketsRepo: ReturnType<typeof mockRepo>;
+  let analyticsService: jest.Mocked<Pick<AnalyticsService, 'logActivity'>>;
+
+  const adminId = 'admin-1';
+
+  const makeMarket = (overrides: Partial<Market> = {}): Market =>
+    ({
+      id: 'market-1',
+      on_chain_market_id: 'on-chain-1',
+      title: 'Test Market',
+      is_featured: true,
+      featured_at: new Date(),
+      ...overrides,
+    }) as Market;
+
+  beforeEach(async () => {
+    marketsRepo = mockRepo();
+    analyticsService = { logActivity: jest.fn().mockResolvedValue({}) };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdminService,
+        { provide: getRepositoryToken(User), useValue: mockRepo() },
+        { provide: getRepositoryToken(Market), useValue: marketsRepo },
+        { provide: getRepositoryToken(Comment), useValue: mockRepo() },
+        { provide: getRepositoryToken(Prediction), useValue: mockRepo() },
+        { provide: getRepositoryToken(Competition), useValue: mockRepo() },
+        { provide: getRepositoryToken(ActivityLog), useValue: mockRepo() },
+        { provide: AnalyticsService, useValue: analyticsService },
+        { provide: NotificationsService, useValue: { create: jest.fn() } },
+        { provide: SorobanService, useValue: { resolveMarket: jest.fn() } },
+      ],
+    }).compile();
+
+    service = module.get<AdminService>(AdminService);
+  });
+
+  it('throws NotFoundException when market does not exist', async () => {
+    marketsRepo.findOne.mockResolvedValue(null);
+
+    await expect(service.unfeatureMarket('bad-id', adminId)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('throws ConflictException when market is not featured', async () => {
+    marketsRepo.findOne.mockResolvedValue(makeMarket({ is_featured: false }));
+
+    await expect(service.unfeatureMarket('market-1', adminId)).rejects.toThrow(
+      ConflictException,
+    );
+  });
+
+  it('unfeatures market and logs admin action', async () => {
+    const market = makeMarket();
+    const unfeaturedMarket = {
+      ...market,
+      is_featured: false,
+      featured_at: null,
+    };
+
+    marketsRepo.findOne.mockResolvedValue(market);
+    marketsRepo.save.mockResolvedValue(unfeaturedMarket);
+
+    const result = await service.unfeatureMarket('market-1', adminId);
+
+    expect(marketsRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        is_featured: false,
+        featured_at: null,
+      }),
+    );
+    expect(analyticsService.logActivity).toHaveBeenCalledWith(
+      adminId,
+      'MARKET_UNFEATURED_BY_ADMIN',
+      expect.objectContaining({
+        market_id: 'market-1',
+        unfeatured_at: expect.any(Date),
+      }),
+    );
+    expect(result.is_featured).toBe(false);
+    expect(result.featured_at).toBeNull();
   });
 });
 
