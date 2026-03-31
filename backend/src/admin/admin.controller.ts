@@ -122,6 +122,22 @@ export class AdminController {
     return this.adminService.moderateComment(id, dto.is_moderated, dto.reason);
   }
 
+  @Patch('markets/:id/feature')
+  async featureMarket(@Param('id') id: string, @Request() req: any) {
+    return this.adminService.featureMarket(
+      id,
+      (req as { user: { id: string } }).user.id,
+    );
+  }
+
+  @Patch('markets/:id/unfeature')
+  async unfeatureMarket(@Param('id') id: string, @Request() req: any) {
+    return this.adminService.unfeatureMarket(
+      id,
+      (req as { user: { id: string } }).user.id,
+    );
+  }
+
   @Get('reports/activity')
   async getActivityReport(@Query() query: ReportQueryDto) {
     return this.adminService.getActivityReport(query);

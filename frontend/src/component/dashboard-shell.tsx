@@ -19,6 +19,7 @@ import {
   User,
   Wallet,
   X,
+  Home,
 } from "lucide-react";
 
 const navigation = [
@@ -37,7 +38,7 @@ function Brand() {
   return (
     <Link
       href="/dashboard"
-      className="flex items-center gap-3 rounded-2xl px-4 py-4 text-white transition hover:bg-white/5"
+      className="flex items-center gap-3 rounded-2xl px-6 py-6 text-white transition hover:bg-white/5"
     >
       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#43c3be] text-xs font-bold text-[#111827] shadow-[0_0_0_6px_rgba(67,195,190,0.12)]">
         IA
@@ -61,7 +62,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
 
   return (
     <div className="flex h-full flex-col bg-[#171d2d] text-white">
-      <div className="border-b border-white/8 px-2 pt-3 pb-4">
+      <div className="border-b border-orange-500/30">
         <Brand />
       </div>
 
@@ -97,8 +98,8 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
         })}
       </nav>
 
-      <div className="border-t border-white/8 px-4 py-4">
-        <div className="rounded-2xl border border-white/8 bg-[#111726] px-4 py-4">
+      <div className="border-t border-orange-500/30 px-4 py-4">
+        <div className="rounded-2xl border border-orange-500/30 bg-[#111726] px-4 py-4">
           <p className="text-xs uppercase tracking-[0.24em] text-[#6f7891]">
             Connected
           </p>
@@ -120,22 +121,26 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
 
 function TopNavigation() {
   return (
-    <section className="border-b border-white/8 px-5 py-4 sm:px-8 lg:px-10">
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-        <div>
+    <section className="border-b border-orange-500/30 px-6">
+      <div className="flex items-center justify-between gap-6 py-4">
+        <Link
+          href="/"
+          className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-transparent p-3 text-white transition hover:bg-white/5 hover:border-orange-500/50 xl:self-start"
+          aria-label="Go to homepage"
+        >
+          <Home className="h-5 w-5" />
+        </Link>
+        <div className="text-center">
           <h1 className="text-3xl font-semibold tracking-tight sm:text-[2.45rem]">
             Welcome back, Ayomide
           </h1>
-          <p className="mt-2 max-w-2xl text-sm text-[#97a0b5] sm:text-base">
-            Here&apos;s a quick overview of your prediction activity and
-            performance.
-          </p>
+          <p className="mt-2 max-w-2xl text-sm text-[#97a0b5] sm:text-base"></p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
             aria-label="Make a prediction"
-            className="rounded-xl bg-[#2f9e9d] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#38adaa]"
+            className="rounded-xl bg-orange-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
           >
             Make Prediction
           </button>
@@ -168,14 +173,14 @@ export function DashboardShell({ children }: DashboardShellProps) {
   return (
     <div className="dark min-h-screen bg-[#141824] text-white">
       <div className="flex min-h-screen">
-        <aside className="hidden w-[280px] shrink-0 border-r border-white/8 lg:fixed lg:inset-y-0 lg:flex">
+        <aside className="hidden w-[280px] shrink-0 border-r border-orange-500/30 lg:fixed lg:inset-y-0 lg:flex">
           <div className="w-full">
             <SidebarContent />
           </div>
         </aside>
 
         <div className="flex min-h-screen w-full flex-col lg:pl-[280px]">
-          <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/8 bg-[#141824]/90 px-4 py-4 backdrop-blur lg:hidden">
+          <header className="sticky top-0 z-30 flex items-center justify-between border-b border-orange-500/30 bg-[#141824]/90 px-4 py-4 backdrop-blur lg:hidden">
             <Brand />
             <button
               type="button"

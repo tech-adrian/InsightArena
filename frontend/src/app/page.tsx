@@ -5,9 +5,6 @@ import Header from "@/component/Header";
 import Footer from "@/component/Footer";
 import HeroSection from "@/component/Homepage/HeroSection";
 
-import FeaturedThisWeek from "@/component/Homepage/FeaturedThisWeek";
-
-
 import HowItWorksSection from "@/component/Homepage/HowItWorksSection";
 import ReputationSection from "@/component/Homepage/ReputationSection";
 import Faq from "@/component/Homepage/Faq";
@@ -74,7 +71,7 @@ export default function Home() {
         <div className="relative z-10">
           <Header />
           <HeroSection />
-          <FeaturedThisWeek />
+
           <ReputationSection />
           <Feature />
           <HowItWorksSection />
@@ -85,20 +82,6 @@ export default function Home() {
           <Footer />
         </div>
       </div>
-
-      <PageBackground>
-        <Header />
-        <HeroSection />
-        <ReputationSection />
-        <Feature />
-        <HowItWorksSection />
-        <ComparisonSection />
-        <TransparentGrid />
-        <StatisticsSection />
-        <Faq />
-        <Footer />
-      </PageBackground>
-
     </>
   );
 }

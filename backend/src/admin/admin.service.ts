@@ -368,6 +368,74 @@ export class AdminService {
     return await this.commentsRepository.save(comment);
   }
 
+  async featureMarket(marketId: string, adminId: string): Promise<Market> {
+    const market = await this.marketsRepository.findOne({
+      where: [{ id: marketId }, { on_chain_market_id: marketId }],
+    });
+
+    if (!market) {
+      throw new NotFoundException(`Market "${marketId}" not found`);
+    }
+
+    if (market.is_featured) {
+      throw new ConflictException('Market is already featured');
+    }
+
+    market.is_featured = true;
+    market.featured_at = new Date();
+    const saved = await this.marketsRepository.save(market);
+
+    // Log admin action
+    await this.analyticsService.logActivity(
+      adminId,
+      'MARKET_FEATURED_BY_ADMIN',
+      {
+        market_id: market.id,
+        featured_at: market.featured_at,
+      },
+    );
+
+    this.logger.log(
+      `Admin ${adminId} featured market "${market.title}" (${market.id})`,
+    );
+
+    return saved;
+  }
+
+  async unfeatureMarket(marketId: string, adminId: string): Promise<Market> {
+    const market = await this.marketsRepository.findOne({
+      where: [{ id: marketId }, { on_chain_market_id: marketId }],
+    });
+
+    if (!market) {
+      throw new NotFoundException(`Market "${marketId}" not found`);
+    }
+
+    if (!market.is_featured) {
+      throw new ConflictException('Market is not featured');
+    }
+
+    market.is_featured = false;
+    market.featured_at = null;
+    const saved = await this.marketsRepository.save(market);
+
+    // Log admin action
+    await this.analyticsService.logActivity(
+      adminId,
+      'MARKET_UNFEATURED_BY_ADMIN',
+      {
+        market_id: market.id,
+        unfeatured_at: new Date(),
+      },
+    );
+
+    this.logger.log(
+      `Admin ${adminId} unfeatured market "${market.title}" (${market.id})`,
+    );
+
+    return saved;
+  }
+
   async getActivityReport(query: ReportQueryDto) {
     const { timeframe, format } = query;
     const now = new Date();

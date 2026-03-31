@@ -16,7 +16,7 @@ export default function Header() {
     { name: "Events", link: "/events" },
     { name: "Leaderboard", link: "/leaderboard" },
     { name: "Docs", link: "/docs" },
-    { name: "Dashboard", link: "/dashboard" },
+    { name: "Profile", link: "/dashboard" },
   ];
 
   const isActive = (path: string) => {

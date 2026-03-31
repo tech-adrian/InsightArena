@@ -235,7 +235,7 @@ export default function LeaderboardPage() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden text-white">
-      <PageBackground />
+
 
       <div className="relative z-10">
         <Header />

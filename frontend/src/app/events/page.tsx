@@ -125,7 +125,7 @@ export default function EventsPage() {
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <button className="px-8 py-3 bg-[#4FD1C5] text-white font-semibold rounded-xl hover:bg-[#3dbdb3] transition">
+                  <button className="px-8 py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition">
                     Browse Events
                   </button>
                   <button className="px-8 py-3 bg-transparent border border-gray-600 text-white font-semibold rounded-xl hover:bg-white/5 transition">
@@ -144,7 +144,7 @@ export default function EventsPage() {
                   <input
                     type="text"
                     placeholder="Search events, competitions..."
-                    className="w-full bg-[#1e293b] text-white pl-12 pr-4 py-3 rounded-xl border border-gray-700/50 focus:border-[#4FD1C5] focus:outline-none transition"
+                    className="w-full bg-[#1e293b] text-white pl-12 pr-4 py-3 rounded-xl border border-gray-700/50 focus:border-orange-500 focus:outline-none transition"
                   />
                 </div>
 
@@ -156,7 +156,7 @@ export default function EventsPage() {
                       onClick={() => setActiveTab(tab.id)}
                       className={`px-6 py-2 rounded-lg font-medium transition ${
                         activeTab === tab.id
-                          ? "bg-[#4FD1C5] text-white"
+                          ? "bg-orange-500 text-white"
                           : "text-gray-400 hover:text-white"
                       }`}
                     >

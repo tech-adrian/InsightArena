@@ -1,12 +1,17 @@
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FlagsService } from './flags.service';
-import { Flag, FlagStatus, FlagReason, FlagResolutionAction } from './entities/flag.entity';
-import { User } from '../users/entities/user.entity';
-import { Market } from '../markets/entities/market.entity';
 import { AnalyticsService } from '../analytics/analytics.service';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Market } from '../markets/entities/market.entity';
+import { User } from '../users/entities/user.entity';
+import {
+  Flag,
+  FlagReason,
+  FlagResolutionAction,
+  FlagStatus,
+} from './entities/flag.entity';
+import { FlagsService } from './flags.service';
 
 describe('FlagsService', () => {
   let service: FlagsService;
@@ -54,7 +59,7 @@ describe('FlagsService', () => {
     created_at: new Date(),
   };
 
-  const mockFlag: Flag = {
+  const createMockFlag = (): Flag => ({
     id: 'flag-1',
     market: mockMarket,
     market_id: 'market-1',
@@ -69,7 +74,7 @@ describe('FlagsService', () => {
     resolved_by_user: null,
     resolved_at: null,
     created_at: new Date(),
-  };
+  });
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -109,7 +114,9 @@ describe('FlagsService', () => {
     service = module.get<FlagsService>(FlagsService);
     flagsRepository = module.get<Repository<Flag>>(getRepositoryToken(Flag));
     usersRepository = module.get<Repository<User>>(getRepositoryToken(User));
-    marketsRepository = module.get<Repository<Market>>(getRepositoryToken(Market));
+    marketsRepository = module.get<Repository<Market>>(
+      getRepositoryToken(Market),
+    );
     analyticsService = module.get<AnalyticsService>(AnalyticsService);
   });
 
@@ -127,12 +134,21 @@ describe('FlagsService', () => {
 
       jest.spyOn(marketsRepository, 'findOne').mockResolvedValue(mockMarket);
       jest.spyOn(flagsRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(flagsRepository, 'create').mockReturnValue(mockFlag);
-      jest.spyOn(flagsRepository, 'save').mockResolvedValue(mockFlag);
+      jest.spyOn(flagsRepository, 'create').mockReturnValue(createMockFlag());
+      jest.spyOn(flagsRepository, 'save').mockResolvedValue(createMockFlag());
 
       const result = await service.createFlag('user-1', createFlagDto);
 
-      expect(result).toEqual(mockFlag);
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'flag-1',
+          market_id: 'market-1',
+          user_id: 'user-1',
+          reason: FlagReason.INAPPROPRIATE_CONTENT,
+          description: 'This is inappropriate',
+          status: FlagStatus.PENDING,
+        }),
+      );
       expect(marketsRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'market-1' },
       });
@@ -140,7 +156,15 @@ describe('FlagsService', () => {
         ...createFlagDto,
         user_id: 'user-1',
       });
-      expect(flagsRepository.save).toHaveBeenCalledWith(mockFlag);
+      expect(flagsRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          market_id: 'market-1',
+          user_id: 'user-1',
+          reason: FlagReason.INAPPROPRIATE_CONTENT,
+          description: 'This is inappropriate',
+          status: FlagStatus.PENDING,
+        }),
+      );
       expect(analyticsService.logActivity).toHaveBeenCalledWith(
         'user-1',
         'MARKET_FLAGGED',
@@ -171,7 +195,9 @@ describe('FlagsService', () => {
       };
 
       jest.spyOn(marketsRepository, 'findOne').mockResolvedValue(mockMarket);
-      jest.spyOn(flagsRepository, 'findOne').mockResolvedValue(mockFlag);
+      jest
+        .spyOn(flagsRepository, 'findOne')
+        .mockResolvedValue(createMockFlag());
 
       await expect(service.createFlag('user-1', createFlagDto)).rejects.toThrow(
         ForbiddenException,
@@ -194,7 +220,7 @@ describe('FlagsService', () => {
         orderBy: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[mockFlag], 1]),
+        getManyAndCount: jest.fn().mockResolvedValue([[createMockFlag()], 1]),
       };
 
       jest
@@ -204,7 +230,7 @@ describe('FlagsService', () => {
       const result = await service.listFlags(query);
 
       expect(result).toEqual({
-        data: [mockFlag],
+        data: [createMockFlag()],
         meta: {
           total: 1,
           page: 1,
@@ -222,9 +248,11 @@ describe('FlagsService', () => {
         admin_notes: 'No action needed',
       };
 
-      jest.spyOn(flagsRepository, 'findOne').mockResolvedValue(mockFlag);
+      jest
+        .spyOn(flagsRepository, 'findOne')
+        .mockResolvedValue(createMockFlag());
       jest.spyOn(flagsRepository, 'save').mockResolvedValue({
-        ...mockFlag,
+        ...createMockFlag(),
         status: FlagStatus.DISMISSED,
         resolution_action: FlagResolutionAction.DISMISS,
         admin_notes: 'No action needed',
@@ -232,7 +260,11 @@ describe('FlagsService', () => {
         resolved_at: new Date(),
       });
 
-      const result = await service.resolveFlag('flag-1', resolveFlagDto, 'admin-1');
+      const result = await service.resolveFlag(
+        'flag-1',
+        resolveFlagDto,
+        'admin-1',
+      );
 
       expect(result.status).toBe(FlagStatus.DISMISSED);
       expect(result.resolution_action).toBe(FlagResolutionAction.DISMISS);
@@ -255,10 +287,12 @@ describe('FlagsService', () => {
         admin_notes: 'Market removed',
       };
 
-      jest.spyOn(flagsRepository, 'findOne').mockResolvedValue(mockFlag);
-      jest.spyOn(marketsRepository, 'update').mockResolvedValue(undefined);
+      jest
+        .spyOn(flagsRepository, 'findOne')
+        .mockResolvedValue(createMockFlag());
+      jest.spyOn(marketsRepository, 'update').mockResolvedValue({} as any);
       jest.spyOn(flagsRepository, 'save').mockResolvedValue({
-        ...mockFlag,
+        ...createMockFlag(),
         status: FlagStatus.RESOLVED,
         resolution_action: FlagResolutionAction.REMOVE_MARKET,
         admin_notes: 'Market removed',
@@ -266,7 +300,11 @@ describe('FlagsService', () => {
         resolved_at: new Date(),
       });
 
-      const result = await service.resolveFlag('flag-1', resolveFlagDto, 'admin-1');
+      const result = await service.resolveFlag(
+        'flag-1',
+        resolveFlagDto,
+        'admin-1',
+      );
 
       expect(marketsRepository.update).toHaveBeenCalledWith('market-1', {
         is_cancelled: true,
@@ -280,10 +318,12 @@ describe('FlagsService', () => {
         admin_notes: 'User banned',
       };
 
-      jest.spyOn(flagsRepository, 'findOne').mockResolvedValue(mockFlag);
-      jest.spyOn(usersRepository, 'update').mockResolvedValue(undefined);
+      jest
+        .spyOn(flagsRepository, 'findOne')
+        .mockResolvedValue(createMockFlag());
+      jest.spyOn(usersRepository, 'update').mockResolvedValue({} as any);
       jest.spyOn(flagsRepository, 'save').mockResolvedValue({
-        ...mockFlag,
+        ...createMockFlag(),
         status: FlagStatus.RESOLVED,
         resolution_action: FlagResolutionAction.BAN_USER,
         admin_notes: 'User banned',
@@ -291,7 +331,11 @@ describe('FlagsService', () => {
         resolved_at: new Date(),
       });
 
-      const result = await service.resolveFlag('flag-1', resolveFlagDto, 'admin-1');
+      const result = await service.resolveFlag(
+        'flag-1',
+        resolveFlagDto,
+        'admin-1',
+      );
 
       expect(usersRepository.update).toHaveBeenCalledWith('user-1', {
         is_banned: true,
@@ -319,7 +363,7 @@ describe('FlagsService', () => {
         action: FlagResolutionAction.DISMISS,
       };
 
-      const resolvedFlag = { ...mockFlag, status: FlagStatus.RESOLVED };
+      const resolvedFlag = { ...createMockFlag(), status: FlagStatus.RESOLVED };
 
       jest.spyOn(flagsRepository, 'findOne').mockResolvedValue(resolvedFlag);
 

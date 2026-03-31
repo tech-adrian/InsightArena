@@ -30,7 +30,7 @@ export default function EventsCompetitionsHero() {
         <div className="mt-8 flex w-full flex-col items-center justify-center gap-3 sm:w-auto sm:flex-row">
           <Button
             size="lg"
-            className="h-12 min-w-44 rounded-xl border border-[#22C8FF] bg-[#18C8FF] px-8 text-sm font-semibold text-[#08111F] shadow-[0_12px_30px_rgba(24,200,255,0.3)] hover:bg-[#2ed0ff] cursor-pointer"
+            className="h-12 min-w-44 rounded-xl border border-orange-500 bg-orange-500 px-8 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(249,115,22,0.3)] hover:bg-orange-600 cursor-pointer"
           >
             Browse Events
           </Button>
@@ -63,7 +63,9 @@ export default function EventsCompetitionsHero() {
                   onClick={() => setActiveTab(tab)}
                   className={cn(
                     "relative pb-2 text-sm font-medium transition-colors",
-                    activeTab === tab ? "text-white" : "text-[#8D95BD] hover:text-white/80",
+                    activeTab === tab
+                      ? "text-white"
+                      : "text-[#8D95BD] hover:text-white/80",
                   )}
                 >
                   {tab}
@@ -94,7 +96,11 @@ export default function EventsCompetitionsHero() {
                   aria-label="Sort competitions"
                 >
                   {sortOptions.map((option) => (
-                    <option key={option} value={option} className="bg-[#252947] text-white">
+                    <option
+                      key={option}
+                      value={option}
+                      className="bg-[#252947] text-white"
+                    >
                       {option}
                     </option>
                   ))}

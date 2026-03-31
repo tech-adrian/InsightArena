@@ -1,7 +1,7 @@
 import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
+    ForbiddenException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -94,7 +94,7 @@ export class FlagsService {
     }
 
     queryBuilder
-      .orderBy(`flag.${sortBy}`, sortOrder)
+      .orderBy(`flag.${sortBy}`, sortOrder as 'ASC' | 'DESC')
       .skip(skip)
       .take(Number(limit));
 
@@ -131,7 +131,7 @@ export class FlagsService {
 
     flag.status = FlagStatus.RESOLVED;
     flag.resolution_action = resolveFlagDto.action;
-    flag.admin_notes = resolveFlagDto.admin_notes;
+    flag.admin_notes = resolveFlagDto.admin_notes || null;
     flag.resolved_by = adminId;
     flag.resolved_at = new Date();
 

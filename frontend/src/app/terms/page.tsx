@@ -1,3 +1,4 @@
+import Header from '@/component/Header';
 import React from 'react';
 
 const TermsPage = () => {
@@ -33,6 +34,7 @@ const TermsPage = () => {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-gray-300">
+      <Header />
       <div className="max-w-6xl mx-auto px-6 py-20">
         
         {/* Header Section */}
