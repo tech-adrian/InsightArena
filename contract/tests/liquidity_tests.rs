@@ -646,3 +646,64 @@ fn test_calculate_lp_tokens_multiple_deposits() {
     assert_eq!(calculate_lp_tokens(500, 1000, 1000), Ok(500));
     assert_eq!(calculate_lp_tokens(750, 1500, 1500), Ok(750));
 }
+
+// ── Volume & History Tests (Issues #559, #560) ────────────────────────────────
+
+use insightarena_contract::market::CreateMarketParams;
+use soroban_sdk::{symbol_short, vec, String, Symbol};
+
+fn deploy_with_admin(env: &Env) -> (InsightArenaContractClient<'_>, Address) {
+    let id = env.register(InsightArenaContract, ());
+    let client = InsightArenaContractClient::new(env, &id);
+    let admin = Address::generate(env);
+    let oracle = Address::generate(env);
+    let xlm_token = register_token(env);
+    env.mock_all_auths();
+    client.initialize(&admin, &oracle, &200_u32, &xlm_token);
+    (client, admin)
+}
+
+fn create_market_params(env: &Env, now: u64) -> CreateMarketParams {
+    CreateMarketParams {
+        title: String::from_str(env, "Title"),
+        description: String::from_str(env, "Desc"),
+        category: Symbol::new(env, "Cat"),
+        outcomes: vec![env, symbol_short!("A"), symbol_short!("B")],
+        end_time: now + 1000,
+        resolution_time: now + 2000,
+        dispute_window: 1000,
+        creator_fee_bps: 0,
+        min_stake: 10_000_000,
+        max_stake: 100_000_000,
+        is_public: true,
+    }
+}
+
+#[test]
+fn test_pool_volume_zero_before_any_swaps() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = deploy(&env);
+    assert_eq!(client.get_pool_volume_24h(&123), 0);
+}
+
+#[test]
+fn test_pool_volume_returns_zero_for_unknown_market() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = deploy(&env);
+    assert_eq!(client.get_pool_volume_24h(&999), 0);
+}
+
+ 
+
+#[test]
+fn test_get_swap_history_empty_before_any_swaps() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = deploy(&env);
+
+    let history = client.get_swap_history(&123);
+    assert_eq!(history.len(), 0);
+}
+ 
