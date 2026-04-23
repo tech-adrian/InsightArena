@@ -660,8 +660,18 @@ fn test_check_conditional_activation_chain() {
     let creator = Address::generate(&env);
 
     let a = client.create_market(&creator, &default_params(&env));
-    let b = client.create_conditional_market(&creator, &a, &symbol_short!("yes"), &default_params(&env));
-    let c = client.create_conditional_market(&creator, &b, &symbol_short!("yes"), &default_params(&env));
+    let b = client.create_conditional_market(
+        &creator,
+        &a,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let c = client.create_conditional_market(
+        &creator,
+        &b,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 10_000);
     client.resolve_market(&oracle, &a, &symbol_short!("yes"));
@@ -725,8 +735,18 @@ fn test_create_conditional_market_increments_depth_for_nested_children() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let c1 = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
-    let c2 = client.create_conditional_market(&creator, &c1, &symbol_short!("yes"), &default_params(&env));
+    let c1 = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let c2 = client.create_conditional_market(
+        &creator,
+        &c1,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     assert_eq!(read_conditional(&env, &client, c1).conditional_depth, 1);
     assert_eq!(read_conditional(&env, &client, c2).conditional_depth, 2);
@@ -740,8 +760,18 @@ fn test_get_conditional_markets_returns_only_direct_children() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let direct = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
-    let _nested = client.create_conditional_market(&creator, &direct, &symbol_short!("yes"), &default_params(&env));
+    let direct = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let _nested = client.create_conditional_market(
+        &creator,
+        &direct,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     let root_children = client.get_conditional_markets(&root);
     assert_eq!(root_children.len(), 1);
@@ -756,7 +786,12 @@ fn test_activation_sets_activation_timestamp_to_ledger_time() {
     let creator = Address::generate(&env);
 
     let parent_id = client.create_market(&creator, &default_params(&env));
-    let child_id = client.create_conditional_market(&creator, &parent_id, &symbol_short!("yes"), &default_params(&env));
+    let child_id = client.create_conditional_market(
+        &creator,
+        &parent_id,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 6_000);
     client.resolve_market(&oracle, &parent_id, &symbol_short!("yes"));
@@ -773,7 +808,12 @@ fn test_non_matching_outcome_never_sets_activation_time() {
     let creator = Address::generate(&env);
 
     let parent_id = client.create_market(&creator, &default_params(&env));
-    let child_id = client.create_conditional_market(&creator, &parent_id, &symbol_short!("yes"), &default_params(&env));
+    let child_id = client.create_conditional_market(
+        &creator,
+        &parent_id,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 7_000);
     client.resolve_market(&oracle, &parent_id, &symbol_short!("no"));
@@ -800,8 +840,18 @@ fn test_get_parent_market_returns_immediate_parent_not_root() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
-    let grandchild = client.create_conditional_market(&creator, &child, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let grandchild = client.create_conditional_market(
+        &creator,
+        &child,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     let parent = client.get_parent_market(&grandchild);
     assert_eq!(parent.market_id, child);
@@ -815,8 +865,18 @@ fn test_chain_order_is_leaf_to_root() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
-    let grandchild = client.create_conditional_market(&creator, &child, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let grandchild = client.create_conditional_market(
+        &creator,
+        &child,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     let chain = client.get_conditional_chain(&grandchild);
     assert_eq!(chain.market_ids.get(0), Some(grandchild));
@@ -846,8 +906,18 @@ fn test_resolving_parent_with_wrong_outcome_keeps_all_children_inactive() {
     let creator = Address::generate(&env);
 
     let parent = client.create_market(&creator, &default_params(&env));
-    let c1 = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
-    let c2 = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
+    let c1 = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let c2 = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 9_000);
     client.resolve_market(&oracle, &parent, &symbol_short!("no"));
@@ -864,7 +934,12 @@ fn test_creation_child_market_is_persisted() {
     let creator = Address::generate(&env);
 
     let parent = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     let market = read_market(&env, &client, child);
     assert_eq!(market.market_id, child);
@@ -878,8 +953,18 @@ fn test_creation_multiple_children_have_unique_ids() {
     let creator = Address::generate(&env);
 
     let parent = client.create_market(&creator, &default_params(&env));
-    let c1 = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
-    let c2 = client.create_conditional_market(&creator, &parent, &symbol_short!("no"), &default_params(&env));
+    let c1 = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let c2 = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("no"),
+        &default_params(&env),
+    );
     assert_ne!(c1, c2);
 }
 
@@ -892,9 +977,19 @@ fn test_creation_children_list_length_increases() {
 
     let parent = client.create_market(&creator, &default_params(&env));
     assert_eq!(client.get_conditional_markets(&parent).len(), 0);
-    client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
+    client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
     assert_eq!(client.get_conditional_markets(&parent).len(), 1);
-    client.create_conditional_market(&creator, &parent, &symbol_short!("no"), &default_params(&env));
+    client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("no"),
+        &default_params(&env),
+    );
     assert_eq!(client.get_conditional_markets(&parent).len(), 2);
 }
 
@@ -906,7 +1001,12 @@ fn test_creation_required_outcome_is_persisted() {
     let creator = Address::generate(&env);
 
     let parent = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &parent, &symbol_short!("no"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("no"),
+        &default_params(&env),
+    );
 
     let conditional = read_conditional(&env, &client, child);
     assert_eq!(conditional.required_outcome, symbol_short!("no"));
@@ -920,7 +1020,12 @@ fn test_creation_new_conditional_starts_inactive() {
     let creator = Address::generate(&env);
 
     let parent = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     assert!(!read_conditional(&env, &client, child).is_activated);
 }
@@ -933,7 +1038,12 @@ fn test_creation_activation_time_none_initially() {
     let creator = Address::generate(&env);
 
     let parent = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     assert_eq!(read_conditional(&env, &client, child).activation_time, None);
 }
@@ -946,8 +1056,18 @@ fn test_creation_nested_parent_link_points_to_immediate_parent() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
-    let grandchild = client.create_conditional_market(&creator, &child, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let grandchild = client.create_conditional_market(
+        &creator,
+        &child,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     let parent = client.get_parent_market(&grandchild);
     assert_eq!(parent.market_id, child);
@@ -961,7 +1081,12 @@ fn test_creation_child_market_can_be_fetched_with_get_market() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
     let loaded = client.get_market(&child);
     assert_eq!(loaded.market_id, child);
 }
@@ -974,9 +1099,24 @@ fn test_creation_depth_three_levels_values() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let c1 = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
-    let c2 = client.create_conditional_market(&creator, &c1, &symbol_short!("yes"), &default_params(&env));
-    let c3 = client.create_conditional_market(&creator, &c2, &symbol_short!("yes"), &default_params(&env));
+    let c1 = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let c2 = client.create_conditional_market(
+        &creator,
+        &c1,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let c3 = client.create_conditional_market(
+        &creator,
+        &c2,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     assert_eq!(read_conditional(&env, &client, c1).conditional_depth, 1);
     assert_eq!(read_conditional(&env, &client, c2).conditional_depth, 2);
@@ -992,7 +1132,12 @@ fn test_creation_limit_allows_depth_five() {
 
     let mut parent = client.create_market(&creator, &default_params(&env));
     for _ in 0..5 {
-        parent = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
+        parent = client.create_conditional_market(
+            &creator,
+            &parent,
+            &symbol_short!("yes"),
+            &default_params(&env),
+        );
     }
 
     assert_eq!(read_conditional(&env, &client, parent).conditional_depth, 5);
@@ -1006,9 +1151,24 @@ fn test_activation_only_matching_child_activates_among_many() {
     let creator = Address::generate(&env);
 
     let parent = client.create_market(&creator, &default_params(&env));
-    let c1 = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
-    let c2 = client.create_conditional_market(&creator, &parent, &symbol_short!("no"), &default_params(&env));
-    let c3 = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
+    let c1 = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let c2 = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("no"),
+        &default_params(&env),
+    );
+    let c3 = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 11_000);
     client.resolve_market(&oracle, &parent, &symbol_short!("yes"));
@@ -1026,7 +1186,12 @@ fn test_activation_children_with_other_outcomes_remain_inactive() {
     let creator = Address::generate(&env);
 
     let parent = client.create_market(&creator, &default_params(&env));
-    let c1 = client.create_conditional_market(&creator, &parent, &symbol_short!("no"), &default_params(&env));
+    let c1 = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("no"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 12_000);
     client.resolve_market(&oracle, &parent, &symbol_short!("yes"));
@@ -1042,8 +1207,18 @@ fn test_activation_with_multiple_levels_only_first_level() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let c1 = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
-    let c2 = client.create_conditional_market(&creator, &c1, &symbol_short!("yes"), &default_params(&env));
+    let c1 = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let c2 = client.create_conditional_market(
+        &creator,
+        &c1,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 13_000);
     client.resolve_market(&oracle, &root, &symbol_short!("yes"));
@@ -1060,11 +1235,19 @@ fn test_activation_after_parent_resolution_stores_timestamp() {
     let creator = Address::generate(&env);
 
     let parent = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 14_000);
     client.resolve_market(&oracle, &parent, &symbol_short!("yes"));
-    assert_eq!(read_conditional(&env, &client, child).activation_time, Some(14_000));
+    assert_eq!(
+        read_conditional(&env, &client, child).activation_time,
+        Some(14_000)
+    );
 }
 
 #[test]
@@ -1075,7 +1258,12 @@ fn test_activation_parent_resolve_wrong_outcome_keeps_timestamp_none() {
     let creator = Address::generate(&env);
 
     let parent = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 15_000);
     client.resolve_market(&oracle, &parent, &symbol_short!("no"));
@@ -1094,7 +1282,10 @@ fn test_activation_resolving_parent_twice_fails() {
     client.resolve_market(&oracle, &parent, &symbol_short!("yes"));
 
     let result = client.try_resolve_market(&oracle, &parent, &symbol_short!("yes"));
-    assert!(matches!(result, Err(Ok(InsightArenaError::MarketAlreadyResolved))));
+    assert!(matches!(
+        result,
+        Err(Ok(InsightArenaError::MarketAlreadyResolved))
+    ));
 }
 
 #[test]
@@ -1106,7 +1297,12 @@ fn test_activation_unrelated_market_resolution_does_not_affect_child() {
 
     let parent_a = client.create_market(&creator, &default_params(&env));
     let parent_b = client.create_market(&creator, &default_params(&env));
-    let child_a = client.create_conditional_market(&creator, &parent_a, &symbol_short!("yes"), &default_params(&env));
+    let child_a = client.create_conditional_market(
+        &creator,
+        &parent_a,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 17_000);
     client.resolve_market(&oracle, &parent_b, &symbol_short!("yes"));
@@ -1122,8 +1318,18 @@ fn test_activation_non_matching_in_nested_structure() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &root, &symbol_short!("no"), &default_params(&env));
-    let grandchild = client.create_conditional_market(&creator, &child, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("no"),
+        &default_params(&env),
+    );
+    let grandchild = client.create_conditional_market(
+        &creator,
+        &child,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 18_000);
     client.resolve_market(&oracle, &root, &symbol_short!("yes"));
@@ -1140,8 +1346,18 @@ fn test_query_get_parent_market_for_second_level() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
-    let grandchild = client.create_conditional_market(&creator, &child, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let grandchild = client.create_conditional_market(
+        &creator,
+        &child,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     let parent = client.get_parent_market(&grandchild);
     assert_eq!(parent.market_id, child);
@@ -1167,8 +1383,18 @@ fn test_query_chain_second_level_depth_is_three() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
-    let grandchild = client.create_conditional_market(&creator, &child, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let grandchild = client.create_conditional_market(
+        &creator,
+        &child,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     let chain = client.get_conditional_chain(&grandchild);
     assert_eq!(chain.depth, 3);
@@ -1182,7 +1408,12 @@ fn test_query_chain_cached_after_first_call_storage_exists() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
     let _ = client.get_conditional_chain(&child);
 
     let contract_id = client.address.clone();
@@ -1202,7 +1433,12 @@ fn test_query_conditional_markets_returns_struct_fields() {
     let creator = Address::generate(&env);
 
     let root = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &root, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &root,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
     let items = client.get_conditional_markets(&root);
     let first = items.get(0).unwrap();
 
@@ -1229,7 +1465,12 @@ fn test_integration_market_lifecycle_parent_then_child_resolution() {
     let creator = Address::generate(&env);
 
     let parent = client.create_market(&creator, &default_params(&env));
-    let child = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
+    let child = client.create_conditional_market(
+        &creator,
+        &parent,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 20_000);
     client.resolve_market(&oracle, &parent, &symbol_short!("yes"));
@@ -1247,8 +1488,18 @@ fn test_integration_resolution_chain_progression_requires_each_parent_resolution
     let creator = Address::generate(&env);
 
     let a = client.create_market(&creator, &default_params(&env));
-    let b = client.create_conditional_market(&creator, &a, &symbol_short!("yes"), &default_params(&env));
-    let c = client.create_conditional_market(&creator, &b, &symbol_short!("yes"), &default_params(&env));
+    let b = client.create_conditional_market(
+        &creator,
+        &a,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
+    let c = client.create_conditional_market(
+        &creator,
+        &b,
+        &symbol_short!("yes"),
+        &default_params(&env),
+    );
 
     set_timestamp(&env, 21_000);
     client.resolve_market(&oracle, &a, &symbol_short!("yes"));
@@ -1284,7 +1535,12 @@ fn test_edge_max_depth_boundary() {
 
     let mut parent = client.create_market(&creator, &default_params(&env));
     for _ in 0..5 {
-        parent = client.create_conditional_market(&creator, &parent, &symbol_short!("yes"), &default_params(&env));
+        parent = client.create_conditional_market(
+            &creator,
+            &parent,
+            &symbol_short!("yes"),
+            &default_params(&env),
+        );
     }
 
     let fail = client.try_create_conditional_market(
@@ -1293,7 +1549,10 @@ fn test_edge_max_depth_boundary() {
         &symbol_short!("yes"),
         &default_params(&env),
     );
-    assert!(matches!(fail, Err(Ok(InsightArenaError::ConditionalDepthExceeded))));
+    assert!(matches!(
+        fail,
+        Err(Ok(InsightArenaError::ConditionalDepthExceeded))
+    ));
 }
 
 #[test]

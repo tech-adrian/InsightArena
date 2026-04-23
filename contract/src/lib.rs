@@ -21,9 +21,9 @@ pub use crate::governance::{Proposal, ProposalType};
 pub use crate::liquidity::{calculate_liquidity_value, calculate_lp_tokens, calculate_swap_output};
 pub use crate::market::CreateMarketParams;
 pub use crate::storage_types::{
-    ConditionalChain, ConditionalMarket, CreatorStats, DataKey, Dispute, InviteCode, LPPosition,
-    LeaderboardEntry, LeaderboardSnapshot, LiquidityPool, Market, MarketStats, PlatformStats,
-    Prediction, Season, SwapRecord, UserProfile,
+    ConditionalChain, ConditionalMarket, CreatorLeaderboardEntry, CreatorStats, DataKey,
+    Dispute, InviteCode, LPPosition, LeaderboardEntry, LeaderboardSnapshot, LiquidityPool,
+    Market, MarketStats, PlatformStats, Prediction, Season, SwapRecord, UserProfile,
 };
 
 use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Vec};
@@ -463,6 +463,11 @@ impl InsightArenaContract {
         creator: Address,
     ) -> Result<CreatorStats, InsightArenaError> {
         reputation::get_creator_stats(env, creator)
+    }
+
+    /// Return a sorted list of top creators by reputation score.
+    pub fn get_top_creators(env: Env, limit: u32) -> Vec<CreatorLeaderboardEntry> {
+        reputation::get_top_creators(&env, limit)
     }
 
     /// Admin function to forcefully reset a creator's statistics.

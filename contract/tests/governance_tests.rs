@@ -7,7 +7,8 @@ use soroban_sdk::{Address, Env};
 
 fn register_token(env: &Env) -> Address {
     let token_admin = Address::generate(env);
-    env.register_stellar_asset_contract_v2(token_admin).address()
+    env.register_stellar_asset_contract_v2(token_admin)
+        .address()
 }
 
 fn deploy(env: &Env) -> (InsightArenaContractClient<'_>, Address) {

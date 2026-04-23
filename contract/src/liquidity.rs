@@ -484,14 +484,16 @@ pub fn update_pool_volume(env: &Env, market_id: u64, amount: i128) {
             new_entries.push_back(entry);
         }
     }
-    
+
     new_entries.push_back((now, amount));
     env.storage()
         .persistent()
         .set(&DataKey::PoolVolume(market_id), &new_entries);
-    env.storage()
-        .persistent()
-        .extend_ttl(&DataKey::PoolVolume(market_id), PERSISTENT_THRESHOLD, PERSISTENT_BUMP);
+    env.storage().persistent().extend_ttl(
+        &DataKey::PoolVolume(market_id),
+        PERSISTENT_THRESHOLD,
+        PERSISTENT_BUMP,
+    );
 }
 
 pub fn get_pool_volume_24h(env: &Env, market_id: u64) -> i128 {
@@ -512,20 +514,32 @@ pub fn get_pool_volume_24h(env: &Env, market_id: u64) -> i128 {
         }
     }
 
-    if env.storage().persistent().has(&DataKey::PoolVolume(market_id)) {
-        env.storage()
-            .persistent()
-            .extend_ttl(&DataKey::PoolVolume(market_id), PERSISTENT_THRESHOLD, PERSISTENT_BUMP);
+    if env
+        .storage()
+        .persistent()
+        .has(&DataKey::PoolVolume(market_id))
+    {
+        env.storage().persistent().extend_ttl(
+            &DataKey::PoolVolume(market_id),
+            PERSISTENT_THRESHOLD,
+            PERSISTENT_BUMP,
+        );
     }
 
     total
 }
 
 pub fn get_swap_history(env: &Env, market_id: u64) -> Vec<SwapRecord> {
-    if env.storage().persistent().has(&DataKey::SwapHistory(market_id)) {
-        env.storage()
-            .persistent()
-            .extend_ttl(&DataKey::SwapHistory(market_id), PERSISTENT_THRESHOLD, PERSISTENT_BUMP);
+    if env
+        .storage()
+        .persistent()
+        .has(&DataKey::SwapHistory(market_id))
+    {
+        env.storage().persistent().extend_ttl(
+            &DataKey::SwapHistory(market_id),
+            PERSISTENT_THRESHOLD,
+            PERSISTENT_BUMP,
+        );
     }
     env.storage()
         .persistent()
