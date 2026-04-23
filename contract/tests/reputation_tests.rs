@@ -385,6 +385,7 @@ fn test_get_top_creators_returns_sorted_by_reputation() {
     // Creator 2: 2/2 resolved, 50 avg participants -> 600 + 100 = 700
     let id2 = client.create_market(&creator2, &default_params(&env));
     let id3 = client.create_market(&creator2, &default_params(&env));
+    env.ledger().set_timestamp(env.ledger().timestamp() + 2000);
     client.resolve_market(&oracle, &id2, &symbol_short!("yes"));
     client.resolve_market(&oracle, &id3, &symbol_short!("no"));
     // Manual stats update for simplicity in testing if needed,
@@ -397,6 +398,7 @@ fn test_get_top_creators_returns_sorted_by_reputation() {
     // Creator 3: 1/2 = (1/2)*600 = 300
     let id4 = client.create_market(&creator3, &default_params(&env));
     let _id5 = client.create_market(&creator3, &default_params(&env));
+    env.ledger().set_timestamp(env.ledger().timestamp() + 2000);
     client.resolve_market(&oracle, &id4, &symbol_short!("yes"));
 
     let top = client.get_top_creators(&10);
