@@ -539,7 +539,7 @@ describe('MarketsService.update', () => {
 
   it('should update category when provided', async () => {
     const market = makeMarket();
-    const dto: UpdateMarketDto = { category: 'Sports' };
+    const dto: UpdateMarketDto = { category: 'Sports' as any };
 
     marketsRepository.findOne.mockResolvedValue(market);
     marketsRepository.save.mockResolvedValue({
