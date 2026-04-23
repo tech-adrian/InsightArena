@@ -1,7 +1,7 @@
 use insightarena_contract::governance::ProposalType;
 use insightarena_contract::storage_types::DataKey;
 use insightarena_contract::{InsightArenaContract, InsightArenaContractClient};
-use soroban_sdk::testutils::Address as _;
+use soroban_sdk::testutils::{Address as _, Ledger as _};
 use soroban_sdk::{Address, Env, Symbol, Vec};
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ fn test_execute_proposal_updates_protocol_fee() {
     let executor = Address::generate(&env);
     client.execute_proposal(&executor, &id);
 
-    let cfg = client.get_config().unwrap();
+    let cfg = client.get_config();
     assert_eq!(cfg.protocol_fee_bps, 500);
 }
 
@@ -164,7 +164,7 @@ fn test_execute_proposal_updates_oracle() {
     let executor = Address::generate(&env);
     client.execute_proposal(&executor, &id);
 
-    let cfg = client.get_config().unwrap();
+    let cfg = client.get_config();
     assert_eq!(cfg.oracle_address, new_oracle);
 }
 
@@ -186,7 +186,7 @@ fn test_execute_proposal_updates_min_stake() {
     let executor = Address::generate(&env);
     client.execute_proposal(&executor, &id);
 
-    let cfg = client.get_config().unwrap();
+    let cfg = client.get_config();
     assert_eq!(cfg.min_stake_xlm, new_min);
 }
 
@@ -262,7 +262,7 @@ fn test_get_proposal_returns_correct_fields() {
     let proposer = Address::generate(&env);
 
     let id = client.create_proposal(&proposer, &ProposalType::UpdateProtocolFee(400), &3_600_u64);
-    let proposal = client.get_proposal(&id).unwrap();
+    let proposal = client.get_proposal(&id);
 
     assert_eq!(proposal.proposal_id, id);
     assert_eq!(proposal.proposer, proposer);
@@ -295,7 +295,7 @@ fn test_get_proposal_reflects_votes_after_voting() {
     client.vote(&voter_a, &id, &true);
     client.vote(&voter_b, &id, &false);
 
-    let proposal = client.get_proposal(&id).unwrap();
+    let proposal = client.get_proposal(&id);
     assert_eq!(proposal.votes_for, 1);
     assert_eq!(proposal.votes_against, 1);
 }
