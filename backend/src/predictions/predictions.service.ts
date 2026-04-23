@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
   NotFoundException,
   Logger,
 } from '@nestjs/common';
@@ -153,6 +154,31 @@ export class PredictionsService {
       });
 
     return { data: enriched, total, page, limit };
+  }
+
+  /**
+   * Retrieve a single prediction by ID with authorization check.
+   * Only the prediction owner or admin can view.
+   * Returns prediction with enriched status.
+   */
+  async findById(id: string, userId: string): Promise<PredictionWithStatus> {
+    const prediction = await this.predictionsRepository.findOne({
+      where: { id },
+      relations: ['market', 'user'],
+    });
+
+    if (!prediction) {
+      throw new NotFoundException(`Prediction "${id}" not found`);
+    }
+
+    // Check authorization: only owner can view
+    if (prediction.user.id !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to view this prediction',
+      );
+    }
+
+    return this.enrichWithStatus(prediction);
   }
 
   private enrichWithStatus(prediction: Prediction): PredictionWithStatus {

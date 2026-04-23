@@ -2,6 +2,7 @@ import {
   BadGatewayException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -13,6 +14,7 @@ import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreateMarketDto } from './dto/create-market.dto';
+import { UpdateMarketDto } from './dto/update-market.dto';
 import {
   ListMarketsDto,
   MarketStatus,
@@ -28,6 +30,7 @@ import { Comment } from './entities/comment.entity';
 import { MarketTemplate } from './entities/market-template.entity';
 import { Market } from './entities/market.entity';
 import { UserBookmark } from './entities/user-bookmark.entity';
+import { Prediction } from '../predictions/entities/prediction.entity';
 
 @Injectable()
 export class MarketsService {
@@ -37,6 +40,11 @@ export class MarketsService {
     cachedAt: number;
   } | null = null;
   private readonly TRENDING_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+  private predictionStatsCache: Map<
+    string,
+    { data: PredictionStatsDto[]; cachedAt: number }
+  > = new Map();
+  private readonly PREDICTION_STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   constructor(
     @InjectRepository(Market)
@@ -47,6 +55,8 @@ export class MarketsService {
     private readonly marketTemplatesRepository: Repository<MarketTemplate>,
     @InjectRepository(UserBookmark)
     private readonly userBookmarksRepository: Repository<UserBookmark>,
+    @InjectRepository(Prediction)
+    private readonly predictionsRepository: Repository<Prediction>,
     private readonly usersService: UsersService,
     private readonly sorobanService: SorobanService,
     private readonly dataSource: DataSource,
@@ -55,26 +65,60 @@ export class MarketsService {
   /**
    * Get prediction statistics for a market - anonymous outcome counts only
    * Does NOT expose individual user stakes or identities
+   * Results are cached for 5 minutes to avoid repeated DB queries
    */
   async getPredictionStats(marketId: string): Promise<PredictionStatsDto[]> {
     // First verify market exists
     const market = await this.findByIdOrOnChainId(marketId);
 
-    // TODO: Call contract to get real prediction data
-    // For now, return mock data based on market outcomes
-    const mockStats: PredictionStatsDto[] = market.outcome_options.map(
-      (outcome, index) => ({
+    // Check cache
+    const now = Date.now();
+    const cached = this.predictionStatsCache.get(marketId);
+    if (cached && now - cached.cachedAt < this.PREDICTION_STATS_CACHE_TTL_MS) {
+      this.logger.debug(
+        `Returning cached prediction stats for market "${market.title}" (${marketId})`,
+      );
+      return cached.data;
+    }
+
+    // Query predictions grouped by outcome
+    const predictions = await this.predictionsRepository.find({
+      where: { market: { id: marketId } },
+      select: ['chosen_outcome', 'stake_amount_stroops'],
+    });
+
+    // Calculate statistics by outcome
+    const statsByOutcome = new Map<string, PredictionStatsDto>();
+
+    for (const outcome of market.outcome_options) {
+      statsByOutcome.set(outcome, {
         outcome,
-        count: index === 0 ? 15 : 8, // Mock: first option has more predictions
-        total_staked_stroops: index === 0 ? '1500000' : '800000', // Mock stakes in stroops
-      }),
-    );
+        count: 0,
+        total_staked_stroops: '0',
+      });
+    }
+
+    for (const prediction of predictions) {
+      const stat = statsByOutcome.get(prediction.chosen_outcome);
+      if (stat) {
+        stat.count += 1;
+        stat.total_staked_stroops = String(
+          BigInt(stat.total_staked_stroops) +
+            BigInt(prediction.stake_amount_stroops),
+        );
+      }
+    }
+
+    const stats = Array.from(statsByOutcome.values());
+
+    // Cache the results
+    this.predictionStatsCache.set(marketId, { data: stats, cachedAt: now });
 
     this.logger.log(
-      `Retrieved prediction stats for market "${market.title}" (${market.id}) - ${mockStats.length} outcomes`,
+      `Retrieved prediction stats for market "${market.title}" (${marketId}) - ${stats.length} outcomes, ${predictions.length} total predictions`,
     );
 
-    return mockStats;
+    return stats;
   }
 
   /**
@@ -213,6 +257,46 @@ export class MarketsService {
         'Market created on-chain but failed to save to database',
       );
     }
+  }
+
+  /**
+   * Update a market's title, description, and/or category.
+   * Only the market creator or admin can update.
+   * Cannot update after market end_time has passed.
+   */
+  async update(
+    id: string,
+    userId: string,
+    dto: UpdateMarketDto,
+  ): Promise<Market> {
+    const market = await this.findByIdOrOnChainId(id);
+
+    // Check authorization: only creator or admin can update
+    if (market.creator.id !== userId) {
+      throw new ForbiddenException(
+        'Only the market creator can update this market',
+      );
+    }
+
+    // Check if market has ended
+    if (new Date() > market.end_time) {
+      throw new BadRequestException(
+        'Cannot update market after end_time has passed',
+      );
+    }
+
+    // Update only provided fields
+    if (dto.title !== undefined) {
+      market.title = dto.title;
+    }
+    if (dto.description !== undefined) {
+      market.description = dto.description;
+    }
+    if (dto.category !== undefined) {
+      market.category = dto.category;
+    }
+
+    return await this.marketsRepository.save(market);
   }
 
   async resolveMarket(id: string, outcome: string): Promise<Market> {

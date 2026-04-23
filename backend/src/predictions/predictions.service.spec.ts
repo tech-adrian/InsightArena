@@ -3,6 +3,7 @@ import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { Repository, ObjectLiteral } from 'typeorm';
@@ -374,6 +375,117 @@ describe('PredictionsService', () => {
       await expect(
         service.updateNote('non-existent', { note: 'Some note' }, makeUser()),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findById', () => {
+    it('should return prediction with enriched status when owned by user', async () => {
+      const user = makeUser();
+      const market = makeMarket({
+        is_resolved: true,
+        resolved_outcome: 'Yes',
+      });
+      const prediction = {
+        id: 'pred-1',
+        user,
+        market,
+        chosen_outcome: 'Yes',
+        stake_amount_stroops: '10000000',
+        payout_claimed: false,
+        payout_amount_stroops: '0',
+        tx_hash: 'abc123',
+        note: null,
+        submitted_at: new Date(),
+      } as Prediction;
+
+      mockPredictionsRepo.findOne.mockResolvedValue(prediction);
+
+      const result = await service.findById('pred-1', user.id);
+
+      expect(result).toMatchObject({
+        id: 'pred-1',
+        chosen_outcome: 'Yes',
+        status: 'won',
+      });
+      expect(mockPredictionsRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 'pred-1' },
+        relations: ['market', 'user'],
+      });
+    });
+
+    it('should throw NotFoundException if prediction does not exist', async () => {
+      mockPredictionsRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.findById('non-existent', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw ForbiddenException if user does not own the prediction', async () => {
+      const owner = makeUser({ id: 'owner-1' });
+      const otherUser = makeUser({ id: 'other-user' });
+      const market = makeMarket();
+      const prediction = {
+        id: 'pred-1',
+        user: owner,
+        market,
+        chosen_outcome: 'Yes',
+      } as Prediction;
+
+      mockPredictionsRepo.findOne.mockResolvedValue(prediction);
+
+      await expect(service.findById('pred-1', otherUser.id)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should compute correct status for active prediction', async () => {
+      const user = makeUser();
+      const market = makeMarket({ is_resolved: false });
+      const prediction = {
+        id: 'pred-1',
+        user,
+        market,
+        chosen_outcome: 'Yes',
+        stake_amount_stroops: '10000000',
+        payout_claimed: false,
+        payout_amount_stroops: '0',
+        tx_hash: 'abc123',
+        note: null,
+        submitted_at: new Date(),
+      } as Prediction;
+
+      mockPredictionsRepo.findOne.mockResolvedValue(prediction);
+
+      const result = await service.findById('pred-1', user.id);
+
+      expect(result.status).toBe('active');
+    });
+
+    it('should compute correct status for lost prediction', async () => {
+      const user = makeUser();
+      const market = makeMarket({
+        is_resolved: true,
+        resolved_outcome: 'No',
+      });
+      const prediction = {
+        id: 'pred-1',
+        user,
+        market,
+        chosen_outcome: 'Yes',
+        stake_amount_stroops: '10000000',
+        payout_claimed: false,
+        payout_amount_stroops: '0',
+        tx_hash: 'abc123',
+        note: null,
+        submitted_at: new Date(),
+      } as Prediction;
+
+      mockPredictionsRepo.findOne.mockResolvedValue(prediction);
+
+      const result = await service.findById('pred-1', user.id);
+
+      expect(result.status).toBe('lost');
     });
   });
 });
