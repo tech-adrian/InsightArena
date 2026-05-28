@@ -1,6 +1,27 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ContractService, ContractEvent, ContractConfig, ContractParticipant } from '../contract/contract.service';
-import { ListParticipantsQueryDto, ParticipantSortBy, SortOrder } from './dto/list-participants-query.dto';
+import {
+  ContractService,
+  ContractEvent,
+  ContractConfig,
+  ContractParticipant,
+  ContractMatch,
+} from '../contract/contract.service';
+import {
+  ListParticipantsQueryDto,
+  ParticipantSortBy,
+  SortOrder as ParticipantSortOrder,
+} from './dto/list-participants-query.dto';
+import {
+  ListMatchesQueryDto,
+  MatchStatus,
+  MatchSortBy,
+  SortOrder,
+} from './dto/list-matches-query.dto';
+import {
+  EventByCodeResponseDto,
+  MatchPreviewDto,
+} from './dto/event-by-code-response.dto';
+import { UserScoreResponseDto } from './dto/user-score-response.dto';
 
 export interface EnrichedEvent extends ContractEvent {
   matchCount: number;
@@ -62,12 +83,15 @@ export class CreatorEventsService {
     eventId: string,
     query: ListParticipantsQueryDto,
   ): Promise<PaginatedParticipants> {
-    const raw: ContractParticipant[] = await this.contractService.getEventParticipants(eventId);
+    const raw: ContractParticipant[] =
+      await this.contractService.getEventParticipants(eventId);
 
     const withStats: ParticipantWithStats[] = raw.map((p, i) => {
       const correct =
-        typeof (p as ContractParticipant & { correctPredictions?: number }).correctPredictions === 'number'
-          ? (p as ContractParticipant & { correctPredictions: number }).correctPredictions
+        typeof (p as ContractParticipant & { correctPredictions?: number })
+          .correctPredictions === 'number'
+          ? (p as ContractParticipant & { correctPredictions: number })
+              .correctPredictions
           : 0;
       const accuracy =
         p.predictionCount > 0
@@ -83,8 +107,14 @@ export class CreatorEventsService {
       };
     });
 
-    const sorted = this.sortParticipants(withStats, query.sortBy, query.sortOrder);
-    sorted.forEach((p, i) => { p.rank = i + 1; });
+    const sorted = this.sortParticipants(
+      withStats,
+      query.sortBy,
+      query.sortOrder,
+    );
+    sorted.forEach((p, i) => {
+      p.rank = i + 1;
+    });
 
     const total = sorted.length;
     const start = (query.page - 1) * query.limit;
@@ -103,7 +133,9 @@ export class CreatorEventsService {
     const config = await this.contractService.getConfig();
 
     if (!config) {
-      this.logger.warn('getContractConfig: contract returned null, returning defaults');
+      this.logger.warn(
+        'getContractConfig: contract returned null, returning defaults',
+      );
       return {
         admin: '',
         aiAgent: '',
@@ -117,12 +149,183 @@ export class CreatorEventsService {
     return config;
   }
 
+  /**
+   * #728 — Get all matches for an event with filtering and sorting
+   */
+  async getEventMatches(
+    eventId: string,
+    query: ListMatchesQueryDto,
+  ): Promise<
+    Array<ContractMatch & { predictionCount: number; userPrediction?: string }>
+  > {
+    const event = await this.contractService.getEvent(eventId);
+    if (!event) {
+      throw new NotFoundException(`Event ${eventId} not found`);
+    }
+
+    let matches = await this.contractService.getEventMatches(eventId);
+
+    // Filter by status
+    if (query.status !== MatchStatus.All) {
+      matches = matches.filter((m) => {
+        if (query.status === MatchStatus.Pending) {
+          return !m.resolved;
+        }
+        if (query.status === MatchStatus.Completed) {
+          return m.resolved;
+        }
+        return true;
+      });
+    }
+
+    // Sort matches
+    matches = this.sortMatches(matches, query.sortBy, query.sortOrder);
+
+    // Add prediction count (would come from contract or DB in real implementation)
+    return matches.map((m) => ({
+      ...m,
+      predictionCount: 0, // Placeholder - would be fetched from contract
+    }));
+  }
+
+  /**
+   * #725 — Get event by invite code
+   */
+  async getEventByInviteCode(code: string): Promise<EventByCodeResponseDto> {
+    const event = await this.contractService.getEventByCode(code);
+
+    if (!event) {
+      throw new NotFoundException(`Event with invite code ${code} not found`);
+    }
+
+    const [matches] = await Promise.all([
+      this.contractService.getEventMatches(event.eventId),
+      this.contractService.getEventWinners(event.eventId),
+    ]);
+
+    // Determine status
+    let status: 'active' | 'full' | 'cancelled' = 'active';
+    if (!event.isActive) {
+      status = 'cancelled';
+    } else if (event.participantCount >= event.maxParticipants) {
+      status = 'full';
+    }
+
+    const matchPreview: MatchPreviewDto[] = matches.slice(0, 5).map((m) => ({
+      matchId: m.matchId,
+      homeTeam: m.homeTeam,
+      awayTeam: m.awayTeam,
+      startTime: m.startTime,
+    }));
+
+    return {
+      eventId: event.eventId,
+      title: event.title,
+      description: event.description,
+      creator: event.creator,
+      participantCount: event.participantCount,
+      maxParticipants: event.maxParticipants,
+      matchCount: matches.length,
+      status,
+      matchPreview,
+      startTime: event.startTime,
+      endTime: event.endTime,
+    };
+  }
+
+  /**
+   * #733 — Get user score for an event
+   */
+  async getUserScore(
+    eventId: string,
+    address: string,
+  ): Promise<UserScoreResponseDto> {
+    const event = await this.contractService.getEvent(eventId);
+    if (!event) {
+      throw new NotFoundException(`Event ${eventId} not found`);
+    }
+
+    const [matches, userPredictions, participants] = await Promise.all([
+      this.contractService.getEventMatches(eventId),
+      this.contractService.getUserPredictions(address, eventId),
+      this.contractService.getEventParticipants(eventId),
+    ]);
+
+    // Find user's rank
+    const userParticipant = participants.find((p) => p.address === address);
+    const rank = userParticipant
+      ? participants.findIndex((p) => p.address === address) + 1
+      : participants.length + 1;
+
+    // Calculate predictions stats
+    let correctPredictions = 0;
+    let incorrectPredictions = 0;
+    let pendingPredictions = 0;
+
+    for (const prediction of userPredictions) {
+      const match = matches.find((m) => m.matchId === prediction.matchId);
+      if (!match) continue;
+
+      if (!match.resolved) {
+        pendingPredictions++;
+      } else if (match.outcome === prediction.chosenOutcome) {
+        correctPredictions++;
+      } else {
+        incorrectPredictions++;
+      }
+    }
+
+    const totalPredictions = userPredictions.length;
+    const resolvedPredictions = correctPredictions + incorrectPredictions;
+    const accuracyPercentage =
+      resolvedPredictions > 0
+        ? Math.round((correctPredictions / resolvedPredictions) * 100)
+        : 0;
+
+    const isWinner =
+      totalPredictions > 0 &&
+      incorrectPredictions === 0 &&
+      pendingPredictions === 0;
+
+    return {
+      address,
+      totalMatches: matches.length,
+      totalPredictions,
+      correctPredictions,
+      incorrectPredictions,
+      pendingPredictions,
+      accuracyPercentage,
+      rank,
+      isWinner,
+    };
+  }
+
+  private sortMatches(
+    matches: ContractMatch[],
+    sortBy: MatchSortBy,
+    sortOrder: SortOrder,
+  ): ContractMatch[] {
+    const dir = sortOrder === SortOrder.Asc ? 1 : -1;
+
+    return [...matches].sort((a, b) => {
+      switch (sortBy) {
+        case MatchSortBy.MatchTime:
+          return (a.startTime - b.startTime) * dir;
+        case MatchSortBy.CreatedAt:
+          // Assuming matches don't have createdAt, use startTime as fallback
+          return (a.startTime - b.startTime) * dir;
+        default:
+          return 0;
+      }
+    });
+  }
+
   private sortParticipants(
     participants: ParticipantWithStats[],
     sortBy: ParticipantSortBy,
-    sortOrder: SortOrder,
+    sortOrder: ParticipantSortOrder,
   ): ParticipantWithStats[] {
-    const dir = sortOrder === SortOrder.Asc ? 1 : -1;
+    const dir = sortOrder === ParticipantSortOrder.Asc ? 1 : -1;
 
     return [...participants].sort((a, b) => {
       switch (sortBy) {
