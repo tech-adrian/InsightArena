@@ -72,7 +72,7 @@ export class AdminService {
     private readonly notificationsService: NotificationsService,
     private readonly sorobanService: SorobanService,
     private readonly flagsService: FlagsService,
-  ) {}
+  ) { }
 
   async getStats(): Promise<StatsResponseDto> {
     const now = new Date();
@@ -451,8 +451,8 @@ export class AdminService {
     await Promise.all(
       predictions.map((p) =>
         this.notificationsService.create(
-          p.user.id,
-          NotificationType.MarketResolved,
+          p.user.stellar_address,
+          NotificationType.MatchResolved,
           'Market Resolved',
           `The market "${market.title}" has been resolved. Winning outcome: ${dto.resolved_outcome}.`,
           {
@@ -560,11 +560,10 @@ export class AdminService {
     await Promise.all(
       participants.map((participant) =>
         this.notificationsService.create(
-          participant.user_id,
-          NotificationType.System,
+          participant.user.stellar_address,
+          NotificationType.EventCancelled,
           'Competition Cancelled',
-          `The competition "${competition.title}" has been cancelled by an administrator.${
-            shouldRefund ? ' Any applicable refunds have been initiated.' : ''
+          `The competition "${competition.title}" has been cancelled by an administrator.${shouldRefund ? ' Any applicable refunds have been initiated.' : ''
           }`,
           {
             competition_id: competition.id,
@@ -747,5 +746,99 @@ export class AdminService {
     }
 
     return reportData;
+  }
+
+  async listCreatorEventsForModeration(query: any) {
+    const {
+      status = 'all',
+      creator,
+      page = 1,
+      limit = 20,
+      sortBy = 'created_at',
+      sortOrder = 'DESC',
+    } = query;
+
+    const skip = (page - 1) * limit;
+    const take = Math.min(limit, 100);
+
+    const qb = this.creatorEventRepository.createQueryBuilder('event');
+    qb.leftJoinAndSelect('event.matches', 'matches');
+
+    // Filter by status
+    if (status !== 'all') {
+      if (status === 'active') {
+        qb.andWhere('event.is_cancelled = false AND event.is_active = true');
+      } else if (status === 'cancelled') {
+        qb.andWhere('event.is_cancelled = true');
+      } else if (status === 'completed') {
+        qb.andWhere('event.is_active = false');
+      } else if (status === 'flagged') {
+        qb.leftJoinAndSelect('event.flags', 'flags');
+        qb.andWhere('flags.id IS NOT NULL');
+      }
+    }
+
+    // Filter by creator
+    if (creator) {
+      qb.andWhere('event.creator_address = :creator', { creator });
+    }
+
+    // Count total before pagination
+    const total = await qb.getCount();
+
+    // Apply sorting and pagination
+    qb.orderBy(`event.${sortBy}`, sortOrder).skip(skip).take(take);
+
+    const events = await qb.getMany();
+
+    // Enrich events with additional data
+    const enrichedEvents = await Promise.all(
+      events.map(async (event) => {
+        const participantCount = event.participant_count || 0;
+        const matchCount = event.match_count || 0;
+
+        // Get creator user info
+        const creatorUser = await this.usersRepository.findOne({
+          where: { stellar_address: event.creator_address },
+        });
+
+        // Get flags for this event (if any)
+        const flags: any[] = [];
+
+        // Get admin actions for this event
+        const adminActions: any[] = [];
+
+        return {
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          status: event.is_cancelled
+            ? 'cancelled'
+            : event.is_active
+              ? 'active'
+              : 'completed',
+          creator: {
+            id: creatorUser?.id || '',
+            stellar_address: event.creator_address,
+            username: creatorUser?.username,
+            avatar_url: creatorUser?.avatar_url,
+            is_verified: creatorUser?.role === 'admin' || false,
+          },
+          participant_count: participantCount,
+          match_count: matchCount,
+          flags,
+          admin_actions: adminActions,
+          created_at: event.created_at.toISOString(),
+          updated_at: event.created_at.toISOString(),
+        };
+      }),
+    );
+
+    return {
+      data: enrichedEvents,
+      total,
+      page,
+      limit: take,
+    };
   }
 }

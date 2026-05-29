@@ -28,6 +28,7 @@ import { DateRangeQueryDto } from './dto/date-range-query.dto';
 import { FeeStatsResponseDto } from './dto/fee-stats-response.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
 import { ListVerifiedAddressesQueryDto } from './dto/list-verified-addresses-query.dto';
+import { ListCreatorEventsQueryDto } from './dto/list-creator-events-query.dto';
 import { ModerateCommentDto } from './dto/moderate-comment.dto';
 import { ReportQueryDto, ReportFormat } from './dto/report-query.dto';
 import { ResolveMarketDto } from './dto/resolve-market.dto';
@@ -40,7 +41,7 @@ type RequestUser = Request & { user: { id: string } };
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.Admin)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(private readonly adminService: AdminService) { }
 
   @Get('dashboard/stats')
   @Roles(Role.Admin, Role.Moderator)
@@ -102,6 +103,25 @@ export class AdminController {
   })
   async listVerifiedAddresses(@Query() query: ListVerifiedAddressesQueryDto) {
     return this.adminService.listVerifiedAddresses(query);
+  }
+
+  @Get('creator-events/moderate')
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(60)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get all events for moderation with filtering and pagination',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated list of events with moderation data',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  async listCreatorEventsForModeration(
+    @Query() query: ListCreatorEventsQueryDto,
+  ) {
+    return this.adminService.listCreatorEventsForModeration(query);
   }
 
   @Patch('users/:id/ban')
