@@ -201,4 +201,100 @@ describe('NotificationsService', () => {
       expect(mockRepository.softDelete).not.toHaveBeenCalled();
     });
   });
+
+  describe('markMultipleAsRead', () => {
+    it('should update multiple notifications as read', async () => {
+      mockRepository.update.mockResolvedValue({ affected: 2 });
+
+      const result = await service.markMultipleAsRead(
+        'GBRPYHIL2CI3WHZDTOOQFC6EB4RRJC3XNRBF7XN',
+        [1, 2],
+      );
+
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_address: 'GBRPYHIL2CI3WHZDTOOQFC6EB4RRJC3XNRBF7XN',
+        }),
+        { read: true },
+      );
+      expect(result).toEqual({ updated: 2 });
+    });
+
+    it('should return 0 when no notifications affected', async () => {
+      mockRepository.update.mockResolvedValue({ affected: undefined });
+
+      const result = await service.markMultipleAsRead(
+        'GBRPYHIL2CI3WHZDTOOQFC6EB4RRJC3XNRBF7XN',
+        [99],
+      );
+
+      expect(result).toEqual({ updated: 0 });
+    });
+  });
+
+  describe('getUnreadCount', () => {
+    it('should return unread count for a user', async () => {
+      mockRepository.count.mockResolvedValue(5);
+
+      const count = await service.getUnreadCount(
+        'GBRPYHIL2CI3WHZDTOOQFC6EB4RRJC3XNRBF7XN',
+      );
+
+      expect(count).toBe(5);
+      expect(mockRepository.count).toHaveBeenCalledWith({
+        where: {
+          user_address: 'GBRPYHIL2CI3WHZDTOOQFC6EB4RRJC3XNRBF7XN',
+          read: false,
+        },
+      });
+    });
+
+    it('should return 0 when user has no unread notifications', async () => {
+      mockRepository.count.mockResolvedValue(0);
+
+      const count = await service.getUnreadCount(
+        'GBRPYHIL2CI3WHZDTOOQFC6EB4RRJC3XNRBF7XN',
+      );
+
+      expect(count).toBe(0);
+    });
+  });
+
+  describe('findAllForUser - type filter', () => {
+    it('should filter by notification type when provided', async () => {
+      mockRepository.findAndCount.mockResolvedValue([[], 0]);
+      mockRepository.count.mockResolvedValue(0);
+
+      await service.findAllForUser(
+        'GBRPYHIL2CI3WHZDTOOQFC6EB4RRJC3XNRBF7XN',
+        1,
+        20,
+        undefined,
+        NotificationType.MatchAdded,
+      );
+
+      expect(mockRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            type: NotificationType.MatchAdded,
+          }),
+        }),
+      );
+    });
+
+    it('should calculate correct skip offset for page 3', async () => {
+      mockRepository.findAndCount.mockResolvedValue([[], 0]);
+      mockRepository.count.mockResolvedValue(0);
+
+      await service.findAllForUser(
+        'GBRPYHIL2CI3WHZDTOOQFC6EB4RRJC3XNRBF7XN',
+        3,
+        10,
+      );
+
+      expect(mockRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 20, take: 10 }),
+      );
+    });
+  });
 });
