@@ -238,6 +238,28 @@ pub fn get_user_predictions(env: &Env, user: Address, event_id: u64) -> Vec<Pred
     predictions
 }
 
+/// Retrieve every prediction submitted for a specific match.
+///
+/// Reads the `MatchPredictions(match_id)` index of prediction IDs, loads each
+/// `Prediction` struct, and returns them as a `Vec<Prediction>` in submission
+/// order (the order in which predictions were placed).
+///
+/// Returns an empty `Vec` when the match has no predictions — including for a
+/// `match_id` that does not exist, since no prediction index is stored for it.
+/// Useful for analytics and displaying a match's full prediction distribution.
+pub fn get_match_predictions(env: &Env, match_id: u64) -> Vec<Prediction> {
+    let prediction_ids = storage::get_match_predictions(env, match_id);
+
+    let mut predictions: Vec<Prediction> = Vec::new(env);
+    for prediction_id in prediction_ids.iter() {
+        if let Ok(prediction) = storage::get_prediction(env, prediction_id) {
+            predictions.push_back(prediction);
+        }
+    }
+
+    predictions
+}
+
 /// Calculate how many users predicted each outcome for a match.
 ///
 /// Returns a tuple `(team_a_count, team_b_count, draw_count)` where each

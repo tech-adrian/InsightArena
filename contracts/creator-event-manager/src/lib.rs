@@ -451,6 +451,16 @@ impl CreatorEventManagerContract {
         prediction::get_prediction_distribution(&env, match_id)
     }
 
+    /// Retrieve every prediction submitted for a specific match (#808).
+    ///
+    /// Returns a `Vec<Prediction>` in submission order. Returns an empty `Vec`
+    /// when the match has no predictions (or the match id does not exist).
+    /// Useful for analytics and displaying a match's full prediction
+    /// distribution.
+    pub fn get_match_predictions(env: Env, match_id: u64) -> Vec<Prediction> {
+        prediction::get_match_predictions(&env, match_id)
+    }
+
     // =========================================================================
     // Oracle / Winner Verification (#798–#801)
     // =========================================================================

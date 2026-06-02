@@ -1,5 +1,6 @@
 mod admin_tests;
 mod event_tests;
+mod get_match_predictions_tests;
 mod match_tests;
 mod oracle_tests;
 mod prediction_tests;
