@@ -48,7 +48,7 @@ export default function CreateEventForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [maxParticipants, setMaxParticipants] = useState(100);
-  const [errors, setErrors] = useState<Partial<EventDraft & { form: string }>>({});
+  const [errors, setErrors] = useState<{ title?: string; description?: string; maxParticipants?: string; form?: string }>({});
   const [creationFee, setCreationFee] = useState<string | null>(null);
   const [isSigning, setIsSigning] = useState(false);
   const [txError, setTxError] = useState<string | null>(null);
