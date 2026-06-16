@@ -19,15 +19,19 @@ fn test_get_config_returns_correct_config() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, creator_event_manager::CreatorEventManagerContract);
+    let contract_id =
+        env.register_contract(None, creator_event_manager::CreatorEventManagerContract);
     let client = CreatorEventManagerContractClient::new(&env, &contract_id);
-    let client: CreatorEventManagerContractClient<'static> = unsafe { core::mem::transmute(client) };
+    let client: CreatorEventManagerContractClient<'static> =
+        unsafe { core::mem::transmute(client) };
 
     let admin = Address::generate(&env);
     let ai_agent = Address::generate(&env);
     let treasury = Address::generate(&env);
     let token_admin = Address::generate(&env);
-    let xlm_token = env.register_stellar_asset_contract_v2(token_admin).address();
+    let xlm_token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
 
     client.initialize(&admin, &ai_agent, &treasury, &xlm_token, &FEE);
 
@@ -45,15 +49,19 @@ fn test_treasury_balance_and_withdraw_success() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, creator_event_manager::CreatorEventManagerContract);
+    let contract_id =
+        env.register_contract(None, creator_event_manager::CreatorEventManagerContract);
     let client = CreatorEventManagerContractClient::new(&env, &contract_id);
-    let client: CreatorEventManagerContractClient<'static> = unsafe { core::mem::transmute(client) };
+    let client: CreatorEventManagerContractClient<'static> =
+        unsafe { core::mem::transmute(client) };
 
     let admin = Address::generate(&env);
     let ai_agent = Address::generate(&env);
     let treasury = Address::generate(&env);
     let token_admin = Address::generate(&env);
-    let xlm_token = env.register_stellar_asset_contract_v2(token_admin).address();
+    let xlm_token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
 
     client.initialize(&admin, &ai_agent, &treasury, &xlm_token, &FEE);
 
@@ -91,15 +99,19 @@ fn test_withdraw_non_admin_rejected() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, creator_event_manager::CreatorEventManagerContract);
+    let contract_id =
+        env.register_contract(None, creator_event_manager::CreatorEventManagerContract);
     let client = CreatorEventManagerContractClient::new(&env, &contract_id);
-    let client: CreatorEventManagerContractClient<'static> = unsafe { core::mem::transmute(client) };
+    let client: CreatorEventManagerContractClient<'static> =
+        unsafe { core::mem::transmute(client) };
 
     let admin = Address::generate(&env);
     let ai_agent = Address::generate(&env);
     let treasury = Address::generate(&env);
     let token_admin = Address::generate(&env);
-    let xlm_token = env.register_stellar_asset_contract_v2(token_admin).address();
+    let xlm_token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
 
     client.initialize(&admin, &ai_agent, &treasury, &xlm_token, &FEE);
 
@@ -119,15 +131,19 @@ fn test_withdraw_insufficient_balance_rejected() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, creator_event_manager::CreatorEventManagerContract);
+    let contract_id =
+        env.register_contract(None, creator_event_manager::CreatorEventManagerContract);
     let client = CreatorEventManagerContractClient::new(&env, &contract_id);
-    let client: CreatorEventManagerContractClient<'static> = unsafe { core::mem::transmute(client) };
+    let client: CreatorEventManagerContractClient<'static> =
+        unsafe { core::mem::transmute(client) };
 
     let admin = Address::generate(&env);
     let ai_agent = Address::generate(&env);
     let treasury = Address::generate(&env);
     let token_admin = Address::generate(&env);
-    let xlm_token = env.register_stellar_asset_contract_v2(token_admin).address();
+    let xlm_token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
 
     client.initialize(&admin, &ai_agent, &treasury, &xlm_token, &FEE);
 
@@ -142,15 +158,19 @@ fn test_withdraw_zero_amount_rejected() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, creator_event_manager::CreatorEventManagerContract);
+    let contract_id =
+        env.register_contract(None, creator_event_manager::CreatorEventManagerContract);
     let client = CreatorEventManagerContractClient::new(&env, &contract_id);
-    let client: CreatorEventManagerContractClient<'static> = unsafe { core::mem::transmute(client) };
+    let client: CreatorEventManagerContractClient<'static> =
+        unsafe { core::mem::transmute(client) };
 
     let admin = Address::generate(&env);
     let ai_agent = Address::generate(&env);
     let treasury = Address::generate(&env);
     let token_admin = Address::generate(&env);
-    let xlm_token = env.register_stellar_asset_contract_v2(token_admin).address();
+    let xlm_token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
 
     client.initialize(&admin, &ai_agent, &treasury, &xlm_token, &FEE);
 

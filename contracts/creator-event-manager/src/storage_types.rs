@@ -10,6 +10,8 @@ pub const MAX_TITLE_LEN: u32 = 200;
 pub const MAX_DESCRIPTION_LEN: u32 = 1000;
 /// Maximum length for team names (characters)
 pub const MAX_TEAM_NAME_LEN: u32 = 100;
+/// Maximum event duration in seconds (90 days)
+pub const MAX_EVENT_DURATION_SECONDS: u64 = 7_776_000;
 /// Valid predicted outcome symbols
 pub const OUTCOME_TEAM_A: &str = "TEAM_A";
 pub const OUTCOME_TEAM_B: &str = "TEAM_B";
@@ -187,6 +189,12 @@ pub struct Event {
     /// Unix timestamp when the event was created
     pub created_at: u64,
 
+    /// Unix timestamp when the event starts accepting predictions
+    pub start_time: u64,
+
+    /// Unix timestamp when the event ends and no more predictions are accepted
+    pub end_time: u64,
+
     /// Whether the event is open for new predictions
     pub is_active: bool,
 
@@ -216,6 +224,8 @@ impl Event {
         description: String,
         creation_fee_paid: i128,
         created_at: u64,
+        start_time: u64,
+        end_time: u64,
         invite_code: Symbol,
         max_participants: u32,
     ) -> Self {
@@ -226,6 +236,8 @@ impl Event {
             description,
             creation_fee_paid,
             created_at,
+            start_time,
+            end_time,
             is_active: true,
             is_cancelled: false,
             invite_code,
@@ -233,6 +245,16 @@ impl Event {
             participant_count: 0,
             match_count: 0,
         }
+    }
+
+    /// `true` once `current_time >= end_time`.
+    pub fn has_ended(&self, current_time: u64) -> bool {
+        current_time >= self.end_time
+    }
+
+    /// `true` if `time` falls within `[start_time, end_time]` (inclusive).
+    pub fn is_within_window(&self, time: u64) -> bool {
+        time >= self.start_time && time <= self.end_time
     }
 
     /// Returns `true` when the event can still accept new participants.
@@ -282,7 +304,7 @@ impl Event {
 
     /// Validate title and description lengths.
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.title.len() == 0 {
+        if self.title.is_empty() {
             return Err("Title cannot be empty");
         }
         if self.title.len() > MAX_TITLE_LEN {
@@ -417,11 +439,7 @@ impl Match {
 
     /// Seconds until the match starts; 0 if already started.
     pub fn time_until_start(&self, current_time: u64) -> u64 {
-        if current_time >= self.match_time {
-            0
-        } else {
-            self.match_time - current_time
-        }
+        self.match_time.saturating_sub(current_time)
     }
 
     /// Seconds since the result was submitted; 0 if no result yet.
@@ -453,13 +471,13 @@ impl Match {
 
     /// Validate team names and internal state consistency.
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.team_a.len() == 0 {
+        if self.team_a.is_empty() {
             return Err("Team A name cannot be empty");
         }
         if self.team_a.len() > MAX_TEAM_NAME_LEN {
             return Err("Team A name exceeds maximum length");
         }
-        if self.team_b.len() == 0 {
+        if self.team_b.is_empty() {
             return Err("Team B name cannot be empty");
         }
         if self.team_b.len() > MAX_TEAM_NAME_LEN {

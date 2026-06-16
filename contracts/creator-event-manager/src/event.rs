@@ -3,7 +3,9 @@ use soroban_sdk::{token::Client as TokenClient, Address, Env, String, Symbol, Ve
 use crate::admin;
 use crate::invite::{self, InviteError};
 use crate::storage::{self, TTL_LEDGERS};
-use crate::storage_types::{DataKey, Event, MAX_DESCRIPTION_LEN, MAX_TITLE_LEN};
+use crate::storage_types::{
+    DataKey, Event, MAX_DESCRIPTION_LEN, MAX_EVENT_DURATION_SECONDS, MAX_TITLE_LEN,
+};
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -30,6 +32,12 @@ pub enum EventError {
     InvalidInviteCode = 8,
     /// Could not generate a unique invite code after 10 attempts.
     CodeGenerationFailed = 9,
+    /// end_time <= start_time
+    InvalidTimeRange = 10,
+    /// start_time < env.ledger().timestamp()
+    EventStartInPast = 11,
+    /// (end_time - start_time) exceeds MAX_EVENT_DURATION_SECONDS
+    EventDurationTooLong = 12,
 }
 
 impl From<InviteError> for EventError {
@@ -51,20 +59,24 @@ impl From<InviteError> for EventError {
 /// 2. Reject if the contract is paused.
 /// 3. Validate title (1–200 chars) and description (1–1000 chars).
 /// 4. Validate `max_participants > 0`.
-/// 5. Check creator has sufficient XLM balance for the creation fee.
-/// 6. Transfer the fee from creator to treasury.
-/// 7. Assign a new `event_id` via the global counter.
-/// 8. Generate a unique 8-character invite code.
-/// 9. Persist the `Event`, empty participant list, empty match list, and the
-///    invite-code → event_id reverse index.
-/// 10. Emit an `EventCreated` event.
-/// 11. Return `(event_id, invite_code)`.
+/// 5. Validate time range: `start_time < end_time`, `start_time >= current_time`,
+///    and duration `<= MAX_EVENT_DURATION_SECONDS`.
+/// 6. Check creator has sufficient XLM balance for the creation fee.
+/// 7. Transfer the fee from creator to treasury.
+/// 8. Assign a new `event_id` via the global counter.
+/// 9. Generate a unique 8-character invite code.
+/// 10. Persist the `Event`, empty participant list, empty match list, and the
+///     invite-code → event_id reverse index.
+/// 11. Emit an `EventCreated` event.
+/// 12. Return `(event_id, invite_code)`.
 pub fn create_event(
     env: &Env,
     creator: Address,
     title: String,
     description: String,
     max_participants: u32,
+    start_time: u64,
+    end_time: u64,
 ) -> Result<(u64, Symbol), EventError> {
     creator.require_auth();
 
@@ -73,17 +85,33 @@ pub fn create_event(
     }
 
     // Validate title: 1–200 chars.
-    if title.len() == 0 || title.len() > MAX_TITLE_LEN {
+    if title.is_empty() || title.len() > MAX_TITLE_LEN {
         return Err(EventError::InvalidTitle);
     }
 
     // Validate description: 1–1000 chars.
-    if description.len() == 0 || description.len() > MAX_DESCRIPTION_LEN {
+    if description.is_empty() || description.len() > MAX_DESCRIPTION_LEN {
         return Err(EventError::InvalidDescription);
     }
 
     if max_participants == 0 {
         return Err(EventError::InvalidMaxParticipants);
+    }
+
+    let current_time = env.ledger().timestamp();
+
+    // Validate time range
+    if end_time <= start_time {
+        return Err(EventError::InvalidTimeRange);
+    }
+
+    if start_time < current_time {
+        return Err(EventError::EventStartInPast);
+    }
+
+    let duration = end_time - start_time;
+    if duration > MAX_EVENT_DURATION_SECONDS {
+        return Err(EventError::EventDurationTooLong);
     }
 
     let fee = admin::get_creation_fee(env).unwrap_or_else(|| panic!("not_initialized"));
@@ -108,7 +136,9 @@ pub fn create_event(
         title,
         description,
         fee,
-        env.ledger().timestamp(),
+        current_time,
+        start_time,
+        end_time,
         invite_code.clone(),
         max_participants,
     );

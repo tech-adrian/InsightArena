@@ -136,9 +136,30 @@ fn test_list_event_matches_returns_all_matches() {
     let (event_id, _) = client.create_event(&creator, &title(&env), &desc(&env), &5u32);
 
     let base_time = 1_000_000u64;
-    add_match(&env, &contract_id, event_id, "Team A", "Team B", base_time + 3000);
-    add_match(&env, &contract_id, event_id, "Team C", "Team D", base_time + 1000);
-    add_match(&env, &contract_id, event_id, "Team E", "Team F", base_time + 2000);
+    add_match(
+        &env,
+        &contract_id,
+        event_id,
+        "Team A",
+        "Team B",
+        base_time + 3000,
+    );
+    add_match(
+        &env,
+        &contract_id,
+        event_id,
+        "Team C",
+        "Team D",
+        base_time + 1000,
+    );
+    add_match(
+        &env,
+        &contract_id,
+        event_id,
+        "Team E",
+        "Team F",
+        base_time + 2000,
+    );
 
     let matches = client.list_event_matches(&event_id);
     assert_eq!(matches.len(), 3);
@@ -166,9 +187,30 @@ fn test_list_event_matches_sorted_by_match_time_ascending() {
 
     let base_time = 2_000_000u64;
     // Insert in reverse order to ensure sort is applied.
-    add_match(&env, &contract_id, event_id, "Team A", "Team B", base_time + 3000);
-    add_match(&env, &contract_id, event_id, "Team C", "Team D", base_time + 1000);
-    add_match(&env, &contract_id, event_id, "Team E", "Team F", base_time + 2000);
+    add_match(
+        &env,
+        &contract_id,
+        event_id,
+        "Team A",
+        "Team B",
+        base_time + 3000,
+    );
+    add_match(
+        &env,
+        &contract_id,
+        event_id,
+        "Team C",
+        "Team D",
+        base_time + 1000,
+    );
+    add_match(
+        &env,
+        &contract_id,
+        event_id,
+        "Team E",
+        "Team F",
+        base_time + 2000,
+    );
 
     let matches = client.list_event_matches(&event_id);
     assert_eq!(matches.len(), 3);
@@ -247,7 +289,14 @@ fn test_add_match_updates_event_match_list() {
     let match_time = env.ledger().timestamp() + 10_000;
 
     let m1 = add_match_full(&env, &contract_id, event_id, "Team A", "Team B", match_time);
-    let m2 = add_match_full(&env, &contract_id, event_id, "Team C", "Team D", match_time + 1000);
+    let m2 = add_match_full(
+        &env,
+        &contract_id,
+        event_id,
+        "Team C",
+        "Team D",
+        match_time + 1000,
+    );
 
     let match_ids = env.as_contract(&contract_id, || storage::get_event_matches(&env, event_id));
     assert_eq!(match_ids.len(), 2);
@@ -267,7 +316,14 @@ fn test_add_match_increments_event_match_count() {
     assert_eq!(client.get_match_count(&event_id), 0);
     add_match_full(&env, &contract_id, event_id, "Team A", "Team B", match_time);
     assert_eq!(client.get_match_count(&event_id), 1);
-    add_match_full(&env, &contract_id, event_id, "Team C", "Team D", match_time + 1000);
+    add_match_full(
+        &env,
+        &contract_id,
+        event_id,
+        "Team C",
+        "Team D",
+        match_time + 1000,
+    );
     assert_eq!(client.get_match_count(&event_id), 2);
 }
 
@@ -283,7 +339,14 @@ fn test_add_match_increments_global_match_counter() {
     // Global counter starts at 1 after initialization
     let m1 = add_match_full(&env, &contract_id, event_id, "Team A", "Team B", match_time);
     assert_eq!(m1, 1);
-    let m2 = add_match_full(&env, &contract_id, event_id, "Team C", "Team D", match_time + 1000);
+    let m2 = add_match_full(
+        &env,
+        &contract_id,
+        event_id,
+        "Team C",
+        "Team D",
+        match_time + 1000,
+    );
     assert_eq!(m2, 2);
 }
 
@@ -317,11 +380,23 @@ fn test_add_match_validates_team_names_empty_rejected() {
     let env = Env::default();
 
     // Empty team A
-    let m = Match::new(1, 1, String::from_str(&env, ""), String::from_str(&env, "Team B"), 100);
+    let m = Match::new(
+        1,
+        1,
+        String::from_str(&env, ""),
+        String::from_str(&env, "Team B"),
+        100,
+    );
     assert!(m.validate().is_err());
 
     // Empty team B
-    let m = Match::new(1, 1, String::from_str(&env, "Team A"), String::from_str(&env, ""), 100);
+    let m = Match::new(
+        1,
+        1,
+        String::from_str(&env, "Team A"),
+        String::from_str(&env, ""),
+        100,
+    );
     assert!(m.validate().is_err());
 }
 
@@ -339,7 +414,8 @@ fn test_add_match_validates_team_name_length() {
     let long_name = [b'x'; 101];
 
     let m = Match::new(
-        1, 1,
+        1,
+        1,
         String::from_bytes(&env, &long_name),
         String::from_str(&env, "Team B"),
         100,
@@ -347,7 +423,8 @@ fn test_add_match_validates_team_name_length() {
     assert!(m.validate().is_err());
 
     let m2 = Match::new(
-        1, 1,
+        1,
+        1,
         String::from_str(&env, "Team A"),
         String::from_bytes(&env, &long_name),
         100,
@@ -360,7 +437,8 @@ fn test_add_match_team_name_length_boundary_ok() {
     let env = Env::default();
     let exact_name = [b'x'; 100];
     let m = Match::new(
-        1, 1,
+        1,
+        1,
         String::from_bytes(&env, &exact_name),
         String::from_str(&env, "Team B"),
         100,
@@ -431,8 +509,12 @@ fn test_get_match_after_result_submission() {
     // Submit result
     env.as_contract(&contract_id, || {
         let mut m = storage::get_match(&env, match_id).expect("match exists");
-        m.submit_result(MatchResult::TeamA, Address::generate(&env), env.ledger().timestamp())
-            .unwrap();
+        m.submit_result(
+            MatchResult::TeamA,
+            Address::generate(&env),
+            env.ledger().timestamp(),
+        )
+        .unwrap();
         storage::set_match(&env, match_id, &m);
     });
 
@@ -453,7 +535,14 @@ fn test_get_match_with_multiple_matches_returns_correct_one() {
     let match_time = env.ledger().timestamp() + 10_000;
 
     let m1 = add_match_full(&env, &contract_id, event_id, "Team A", "Team B", match_time);
-    let m2 = add_match_full(&env, &contract_id, event_id, "Team C", "Team D", match_time + 1000);
+    let m2 = add_match_full(
+        &env,
+        &contract_id,
+        event_id,
+        "Team C",
+        "Team D",
+        match_time + 1000,
+    );
 
     let stored1 = env.as_contract(&contract_id, || {
         storage::get_match(&env, m1).expect("match m1 exists")
@@ -482,7 +571,10 @@ fn test_list_event_matches_single_match() {
 
     let matches = client.list_event_matches(&event_id);
     assert_eq!(matches.len(), 1);
-    assert_eq!(matches.get(0).unwrap().team_a, String::from_str(&env, "Team A"));
+    assert_eq!(
+        matches.get(0).unwrap().team_a,
+        String::from_str(&env, "Team A")
+    );
 }
 
 #[test]
@@ -511,8 +603,22 @@ fn test_list_event_matches_returns_different_events_separately() {
     let (event_id_2, _) = client.create_event(&creator, &title(&env), &desc(&env), &5u32);
 
     let match_time = env.ledger().timestamp() + 10_000;
-    add_match_full(&env, &contract_id, event_id_1, "Team A", "Team B", match_time);
-    add_match_full(&env, &contract_id, event_id_2, "Team C", "Team D", match_time);
+    add_match_full(
+        &env,
+        &contract_id,
+        event_id_1,
+        "Team A",
+        "Team B",
+        match_time,
+    );
+    add_match_full(
+        &env,
+        &contract_id,
+        event_id_2,
+        "Team C",
+        "Team D",
+        match_time,
+    );
 
     assert_eq!(client.list_event_matches(&event_id_1).len(), 1);
     assert_eq!(client.list_event_matches(&event_id_2).len(), 1);
@@ -534,8 +640,11 @@ fn test_get_match_count_increments_after_each_add() {
     for i in 1..=5 {
         let team = format!("Team {}", i);
         add_match_full(
-            &env, &contract_id, event_id,
-            &team, "Opponent",
+            &env,
+            &contract_id,
+            event_id,
+            &team,
+            "Opponent",
             match_time + (i as u64 * 1000),
         );
         assert_eq!(client.get_match_count(&event_id), i as u32);
@@ -552,9 +661,30 @@ fn test_get_match_count_independent_across_events() {
     let (event_id_2, _) = client.create_event(&creator, &title(&env), &desc(&env), &5u32);
 
     let match_time = env.ledger().timestamp() + 10_000;
-    add_match_full(&env, &contract_id, event_id_1, "Team A", "Team B", match_time);
-    add_match_full(&env, &contract_id, event_id_1, "Team C", "Team D", match_time + 1000);
-    add_match_full(&env, &contract_id, event_id_2, "Team E", "Team F", match_time);
+    add_match_full(
+        &env,
+        &contract_id,
+        event_id_1,
+        "Team A",
+        "Team B",
+        match_time,
+    );
+    add_match_full(
+        &env,
+        &contract_id,
+        event_id_1,
+        "Team C",
+        "Team D",
+        match_time + 1000,
+    );
+    add_match_full(
+        &env,
+        &contract_id,
+        event_id_2,
+        "Team E",
+        "Team F",
+        match_time,
+    );
 
     assert_eq!(client.get_match_count(&event_id_1), 2);
     assert_eq!(client.get_match_count(&event_id_2), 1);
@@ -580,7 +710,14 @@ fn test_add_match_team_time_can_be_in_future() {
     let (event_id, _) = client.create_event(&creator, &title(&env), &desc(&env), &5u32);
     // Future time (1 year from now)
     let future_time = env.ledger().timestamp() + 31_536_000;
-    let match_id = add_match_full(&env, &contract_id, event_id, "Team A", "Team B", future_time);
+    let match_id = add_match_full(
+        &env,
+        &contract_id,
+        event_id,
+        "Team A",
+        "Team B",
+        future_time,
+    );
 
     let stored = env.as_contract(&contract_id, || {
         storage::get_match(&env, match_id).expect("future match should exist")

@@ -20,6 +20,7 @@ pub enum OracleError {
     /// Not all matches in the event have been resolved yet.
     MatchesNotComplete = 4,
     /// No creation fee has been set (should not happen after init).
+    #[allow(dead_code)]
     CreationFeeNotSet = 5,
     /// Arithmetic overflow occurred during calculation.
     Overflow = 6,
@@ -273,6 +274,7 @@ pub fn verify_event_winners(env: &Env, caller: Address, event_id: u64) -> Result
         }
     }
 
+    #[allow(clippy::unnecessary_cast)]
     let winner_count = winners.len() as u32;
 
     // Store winners in EventWinners(event_id)
@@ -381,6 +383,7 @@ pub fn get_user_score(env: &Env, user: Address, event_id: u64) -> Result<(u32, u
 ///
 /// # Returns
 /// The creation fee in stroops (i128).
+#[allow(dead_code)]
 pub fn get_creation_fee(env: &Env) -> Result<i128, OracleError> {
     admin::get_creation_fee(env).ok_or(OracleError::CreationFeeNotSet)
 }

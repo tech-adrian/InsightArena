@@ -2,16 +2,16 @@
 
 pub mod admin;
 mod event;
+mod fee;
 mod invite;
-mod oracle;
 pub mod r#match;
+mod oracle;
 pub mod prediction;
 pub mod storage;
 pub mod storage_types;
 mod token;
 pub mod verification;
 pub mod views;
-mod fee;
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 
@@ -250,6 +250,9 @@ impl CreatorEventManagerContract {
     /// * `"invalid_title"` — title is empty or > 200 chars.
     /// * `"invalid_description"` — description is empty or > 1000 chars.
     /// * `"invalid_max_participants"` — max_participants is 0.
+    /// * `"invalid_time_range"` — end_time <= start_time.
+    /// * `"event_start_in_past"` — start_time < current timestamp.
+    /// * `"event_duration_too_long"` — duration exceeds MAX_EVENT_DURATION_SECONDS.
     /// * `"insufficient_fee"` — creator's XLM balance is below the creation fee.
     /// * `"code_generation_failed"` — could not generate a unique invite code.
     pub fn create_event(
@@ -258,13 +261,26 @@ impl CreatorEventManagerContract {
         title: String,
         description: String,
         max_participants: u32,
+        start_time: u64,
+        end_time: u64,
     ) -> (u64, Symbol) {
-        match event::create_event(&env, creator, title, description, max_participants) {
+        match event::create_event(
+            &env,
+            creator,
+            title,
+            description,
+            max_participants,
+            start_time,
+            end_time,
+        ) {
             Ok(result) => result,
             Err(EventError::Paused) => panic!("contract_paused"),
             Err(EventError::InvalidTitle) => panic!("invalid_title"),
             Err(EventError::InvalidDescription) => panic!("invalid_description"),
             Err(EventError::InvalidMaxParticipants) => panic!("invalid_max_participants"),
+            Err(EventError::InvalidTimeRange) => panic!("invalid_time_range"),
+            Err(EventError::EventStartInPast) => panic!("event_start_in_past"),
+            Err(EventError::EventDurationTooLong) => panic!("event_duration_too_long"),
             Err(EventError::InsufficientFee) => panic!("insufficient_fee"),
             Err(EventError::TransferFailed) => panic!("transfer_failed"),
             Err(EventError::CodeGenerationFailed) => panic!("code_generation_failed"),

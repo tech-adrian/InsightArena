@@ -114,7 +114,8 @@ fn test_submit_match_result_ai_agent_can_submit() {
 
     submit_match_result(&env, &contract_id, &ai_agent, match_id, MatchResult::TeamA);
 
-    let match_record = env.as_contract(&contract_id, || storage::get_match(&env, match_id).unwrap());
+    let match_record =
+        env.as_contract(&contract_id, || storage::get_match(&env, match_id).unwrap());
     assert!(match_record.result_submitted);
     assert_eq!(match_record.winning_team, Some(0));
 }
@@ -144,7 +145,8 @@ fn test_submit_match_result_match_updated_correctly() {
 
     submit_match_result(&env, &contract_id, &ai_agent, match_id, MatchResult::Draw);
 
-    let match_record = env.as_contract(&contract_id, || storage::get_match(&env, match_id).unwrap());
+    let match_record =
+        env.as_contract(&contract_id, || storage::get_match(&env, match_id).unwrap());
     assert!(match_record.result_submitted);
     assert_eq!(match_record.winning_team, Some(2)); // Draw = 2
     assert_eq!(match_record.submitted_by, Some(ai_agent.clone()));
@@ -241,8 +243,20 @@ fn test_verify_event_winners_partial_scores_excluded() {
     client.submit_prediction(&user2, &match_id_2, &Symbol::new(&env, "TEAM_A"));
 
     env.ledger().with_mut(|l| l.timestamp += 25_000);
-    submit_match_result(&env, &contract_id, &ai_agent, match_id_1, MatchResult::TeamA);
-    submit_match_result(&env, &contract_id, &ai_agent, match_id_2, MatchResult::TeamB);
+    submit_match_result(
+        &env,
+        &contract_id,
+        &ai_agent,
+        match_id_1,
+        MatchResult::TeamA,
+    );
+    submit_match_result(
+        &env,
+        &contract_id,
+        &ai_agent,
+        match_id_2,
+        MatchResult::TeamB,
+    );
 
     let winner_count = client.verify_event_winners(&user1, &event_id);
     assert_eq!(winner_count, 1); // Only user1 has perfect score
@@ -334,9 +348,9 @@ fn test_verify_event_winners_completion_time_tracked() {
 
     // User1 predicts first
     client.submit_prediction(&user1, &match_id, &Symbol::new(&env, "TEAM_A"));
-    
+
     env.ledger().with_mut(|l| l.timestamp += 100);
-    
+
     // User2 predicts later
     client.submit_prediction(&user2, &match_id, &Symbol::new(&env, "TEAM_A"));
 
@@ -347,7 +361,7 @@ fn test_verify_event_winners_completion_time_tracked() {
 
     let winners = client.get_event_winners(&event_id);
     assert_eq!(winners.len(), 2);
-    
+
     // Winners should be sorted by completion time
     let first = winners.get(0).unwrap();
     let second = winners.get(1).unwrap();
@@ -397,9 +411,9 @@ fn test_get_event_winners_sorted_by_completion_time() {
     client.join_event(&user2, &invite_code);
 
     client.submit_prediction(&user2, &match_id, &Symbol::new(&env, "TEAM_A"));
-    
+
     env.ledger().with_mut(|l| l.timestamp += 500);
-    
+
     client.submit_prediction(&user1, &match_id, &Symbol::new(&env, "TEAM_A"));
 
     env.ledger().with_mut(|l| l.timestamp += 15_000);
@@ -409,7 +423,7 @@ fn test_get_event_winners_sorted_by_completion_time() {
 
     let winners = client.get_event_winners(&event_id);
     assert_eq!(winners.len(), 2);
-    
+
     let first = winners.get(0).unwrap();
     let second = winners.get(1).unwrap();
     assert!(first.completion_time <= second.completion_time);
@@ -483,8 +497,20 @@ fn test_get_user_score_calculation_accurate() {
     client.submit_prediction(&user, &match_id_2, &Symbol::new(&env, "TEAM_B"));
 
     env.ledger().with_mut(|l| l.timestamp += 25_000);
-    submit_match_result(&env, &contract_id, &ai_agent, match_id_1, MatchResult::TeamA);
-    submit_match_result(&env, &contract_id, &ai_agent, match_id_2, MatchResult::TeamA);
+    submit_match_result(
+        &env,
+        &contract_id,
+        &ai_agent,
+        match_id_1,
+        MatchResult::TeamA,
+    );
+    submit_match_result(
+        &env,
+        &contract_id,
+        &ai_agent,
+        match_id_2,
+        MatchResult::TeamA,
+    );
 
     let (correct, total) = client.get_user_score(&user, &event_id);
     assert_eq!(correct, 1);

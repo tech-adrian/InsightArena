@@ -175,16 +175,16 @@ pub struct PlatformStatistics {
 /// `PlatformStatistics` struct with aggregated platform data.
 pub fn get_platform_statistics(env: &Env) -> PlatformStatistics {
     let instance = env.storage().instance();
-    
+
     // Get counters
     let total_events = instance
         .get::<DataKey, u64>(&DataKey::EventCounter(0))
         .unwrap_or(0);
-    
+
     let total_matches = instance
         .get::<DataKey, u64>(&DataKey::MatchCounter(0))
         .unwrap_or(0);
-    
+
     let total_predictions = instance
         .get::<DataKey, u64>(&DataKey::PredictionCounter(0))
         .unwrap_or(0);

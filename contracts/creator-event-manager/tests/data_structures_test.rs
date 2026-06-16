@@ -2,7 +2,6 @@
 ///
 /// Achieves 100% code coverage for the storage_types module by covering every
 /// method, edge case, validation branch, and helper function.
-
 use creator_event_manager::storage_types::{
     Event, Match, MatchResult, Prediction, Winner, MAX_TEAM_NAME_LEN, OUTCOME_DRAW, OUTCOME_TEAM_A,
     OUTCOME_TEAM_B,
@@ -130,7 +129,10 @@ fn test_event_add_participant_rejects_when_full() {
         1u32,
     );
     assert!(event.add_participant().is_ok());
-    assert_eq!(event.add_participant(), Err("Event has reached maximum participants"));
+    assert_eq!(
+        event.add_participant(),
+        Err("Event has reached maximum participants")
+    );
 }
 
 #[test]
@@ -178,7 +180,8 @@ fn test_match_time_since_result_with_result() {
     let now = result_time + 3600;
 
     let mut m = make_match(&env, 1, 100, match_time);
-    m.submit_result(MatchResult::TeamA, oracle, result_time).unwrap();
+    m.submit_result(MatchResult::TeamA, oracle, result_time)
+        .unwrap();
 
     assert_eq!(m.time_since_result(now), 3600);
 }
@@ -325,7 +328,10 @@ fn test_match_validate_result_submitted_missing_submitted_by() {
     m.winning_team = Some(0u32);
     m.submitted_at = Some(100);
     // submitted_by left as None
-    assert_eq!(m.validate(), Err("Result submitted but submitted_by is None"));
+    assert_eq!(
+        m.validate(),
+        Err("Result submitted but submitted_by is None")
+    );
 }
 
 #[test]
@@ -336,7 +342,10 @@ fn test_match_validate_result_submitted_missing_submitted_at() {
     m.winning_team = Some(0u32);
     m.submitted_by = Some(Address::generate(&env));
     // submitted_at left as None
-    assert_eq!(m.validate(), Err("Result submitted but submitted_at is None"));
+    assert_eq!(
+        m.validate(),
+        Err("Result submitted but submitted_at is None")
+    );
 }
 
 #[test]
@@ -358,7 +367,10 @@ fn test_match_validate_submitted_at_without_result() {
     let env = Env::default();
     let mut m = make_match(&env, 1, 100, 0);
     m.submitted_at = Some(100);
-    assert_eq!(m.validate(), Err("submitted_at set but result_submitted is false"));
+    assert_eq!(
+        m.validate(),
+        Err("submitted_at set but result_submitted is false")
+    );
 }
 
 #[test]
@@ -368,15 +380,22 @@ fn test_match_validate_submitted_by_without_result() {
     m.submitted_by = Some(Address::generate(&env));
     m.winning_team = Some(0u32);
     // result_submitted is false
-    assert_eq!(m.validate(), Err("winning_team set but result_submitted is false"));
+    assert_eq!(
+        m.validate(),
+        Err("winning_team set but result_submitted is false")
+    );
 }
 
 #[test]
 fn test_match_validate_ok_with_result() {
     let env = Env::default();
     let mut m = make_match(&env, 1, 100, 1_640_995_200);
-    m.submit_result(MatchResult::Draw, Address::generate(&env), 1_640_995_200 + 7200)
-        .unwrap();
+    m.submit_result(
+        MatchResult::Draw,
+        Address::generate(&env),
+        1_640_995_200 + 7200,
+    )
+    .unwrap();
     assert!(m.validate().is_ok());
 }
 
@@ -404,8 +423,12 @@ fn test_prediction_validate_outcome_rejects_invalid() {
 fn test_prediction_grade_team_a_correct() {
     let env = Env::default();
     let mut pred = Prediction::new(
-        1, 5, 10, Address::generate(&env),
-        Symbol::new(&env, OUTCOME_TEAM_A), 1_640_995_200,
+        1,
+        5,
+        10,
+        Address::generate(&env),
+        Symbol::new(&env, OUTCOME_TEAM_A),
+        1_640_995_200,
     );
     pred.grade(&Symbol::new(&env, OUTCOME_TEAM_A));
     assert_eq!(pred.is_correct, Some(true));
@@ -416,8 +439,12 @@ fn test_prediction_grade_team_a_correct() {
 fn test_prediction_grade_team_a_wrong() {
     let env = Env::default();
     let mut pred = Prediction::new(
-        1, 5, 10, Address::generate(&env),
-        Symbol::new(&env, OUTCOME_TEAM_A), 1_640_995_200,
+        1,
+        5,
+        10,
+        Address::generate(&env),
+        Symbol::new(&env, OUTCOME_TEAM_A),
+        1_640_995_200,
     );
     pred.grade(&Symbol::new(&env, OUTCOME_TEAM_B));
     assert_eq!(pred.is_correct, Some(false));
@@ -428,8 +455,12 @@ fn test_prediction_grade_team_a_wrong() {
 fn test_prediction_grade_draw_correct() {
     let env = Env::default();
     let mut pred = Prediction::new(
-        1, 5, 10, Address::generate(&env),
-        Symbol::new(&env, OUTCOME_DRAW), 1_640_995_200,
+        1,
+        5,
+        10,
+        Address::generate(&env),
+        Symbol::new(&env, OUTCOME_DRAW),
+        1_640_995_200,
     );
     pred.grade(&Symbol::new(&env, OUTCOME_DRAW));
     assert_eq!(pred.is_correct, Some(true));
@@ -440,8 +471,12 @@ fn test_prediction_grade_draw_correct() {
 fn test_prediction_is_before_match_time_boundary() {
     let env = Env::default();
     let pred = Prediction::new(
-        1, 5, 10, Address::generate(&env),
-        Symbol::new(&env, OUTCOME_TEAM_A), 100,
+        1,
+        5,
+        10,
+        Address::generate(&env),
+        Symbol::new(&env, OUTCOME_TEAM_A),
+        100,
     );
     // predicted_at (100) < match_time (100) => false (not strictly before)
     assert!(!pred.is_before_match_time(100));
@@ -481,12 +516,8 @@ fn test_winner_accuracy_percentage_one_match() {
 fn test_winner_outranks_by_correct_count_only() {
     let env = Env::default();
     // w1 has more correct but later completion
-    let w1 = Winner::new(
-        Address::generate(&env), 1, 5, 5, 9999, 0,
-    );
-    let w2 = Winner::new(
-        Address::generate(&env), 1, 3, 5, 0, 0,
-    );
+    let w1 = Winner::new(Address::generate(&env), 1, 5, 5, 9999, 0);
+    let w2 = Winner::new(Address::generate(&env), 1, 3, 5, 0, 0);
     // w1 outranks because more correct, even though later completion
     assert!(w1.outranks(&w2));
     assert!(!w2.outranks(&w1));
@@ -496,12 +527,8 @@ fn test_winner_outranks_by_correct_count_only() {
 fn test_winner_outranks_tiebreak_respected() {
     let env = Env::default();
     // Same correct count (4), w2 finished earlier
-    let w1 = Winner::new(
-        Address::generate(&env), 1, 4, 5, 2000, 0,
-    );
-    let w2 = Winner::new(
-        Address::generate(&env), 1, 4, 5, 1000, 0,
-    );
+    let w1 = Winner::new(Address::generate(&env), 1, 4, 5, 2000, 0);
+    let w2 = Winner::new(Address::generate(&env), 1, 4, 5, 1000, 0);
     // w2 should outrank w1 (earlier completion time)
     assert!(w2.outranks(&w1));
     assert!(!w1.outranks(&w2));
