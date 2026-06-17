@@ -4,6 +4,7 @@ pub mod admin;
 mod event;
 mod fee;
 mod invite;
+mod leaderboard;
 pub mod r#match;
 mod oracle;
 pub mod prediction;
@@ -18,7 +19,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 use admin::AdminError;
 use event::EventError;
 use r#match::MatchError;
-use storage_types::{Event, Match, Prediction, Winner};
+use storage_types::{Event, Match, Prediction, LeaderboardEntry};
 use verification::VerificationError;
 use views::{EventStatistics, PlatformStatistics};
 
@@ -549,43 +550,6 @@ impl CreatorEventManagerContract {
         }
     }
 
-    /// Verify and record all perfect scorers for an event.
-    ///
-    /// After all matches in an event are resolved, calculate which users
-    /// predicted all matches correctly and store them as winners.
-    ///
-    /// # Panics
-    /// * `"contract_paused"` — contract is paused.
-    /// * `"event_not_found"` — no event exists with the given ID.
-    /// * `"event_cancelled"` — event has been cancelled.
-    /// * `"matches_not_complete"` — not all matches have been resolved.
-    pub fn verify_event_winners(env: Env, caller: Address, event_id: u64) -> u32 {
-        match oracle::verify_event_winners(&env, caller, event_id) {
-            Ok(count) => count,
-            Err(oracle::OracleError::Paused) => panic!("contract_paused"),
-            Err(oracle::OracleError::EventNotFound) => panic!("event_not_found"),
-            Err(oracle::OracleError::EventCancelled) => panic!("event_cancelled"),
-            Err(oracle::OracleError::MatchesNotComplete) => panic!("matches_not_complete"),
-            Err(oracle::OracleError::Overflow) => panic!("overflow"),
-            Err(_) => panic!("unexpected_error"),
-        }
-    }
-
-    /// Retrieve the list of winners for an event.
-    ///
-    /// Public view function to retrieve the list of winners for an event.
-    /// Used for leaderboards and rewards.
-    ///
-    /// # Panics
-    /// * `"event_not_found"` — no event exists with the given ID.
-    pub fn get_event_winners(env: Env, event_id: u64) -> Vec<Winner> {
-        match oracle::get_event_winners(&env, event_id) {
-            Ok(winners) => winners,
-            Err(oracle::OracleError::EventNotFound) => panic!("event_not_found"),
-            Err(_) => panic!("unexpected_error"),
-        }
-    }
-
     /// Calculate a user's score and statistics for an event.
     ///
     /// Returns a tuple `(total_points, correct_results, exact_scores, total_matches)` where:
@@ -604,6 +568,33 @@ impl CreatorEventManagerContract {
             Err(oracle::OracleError::EventNotFound) => panic!("event_not_found"),
             Err(oracle::OracleError::Overflow) => panic!("overflow"),
             Err(_) => panic!("unexpected_error"),
+        }
+    }
+
+    /// Get a ranked leaderboard for an event (#967).
+    ///
+    /// Returns all event participants ranked by total points earned from their
+    /// predictions. The leaderboard is computed live and can be called before
+    /// all matches are resolved; unresolved matches contribute 0 points.
+    ///
+    /// Ranking tiebreakers (in order):
+    /// 1. Higher total_points
+    /// 2. Higher exact_scores
+    /// 3. Earlier last_prediction_time (commits reward)
+    /// 4. Address byte comparison (deterministic final tiebreaker)
+    ///
+    /// Returns a `Vec<LeaderboardEntry>` sorted by rank ascending (rank 1 first).
+    /// Each entry includes the participant's address, total points, correct results
+    /// count, exact scores count, and their assigned rank.
+    ///
+    /// # Panics
+    /// * `"event_not_found"` — no event exists with the given ID.
+    /// * `"overflow"` — arithmetic overflow during calculation.
+    pub fn get_event_leaderboard(env: Env, event_id: u64) -> Vec<LeaderboardEntry> {
+        match leaderboard::get_event_leaderboard(&env, event_id) {
+            Ok(entries) => entries,
+            Err(leaderboard::LeaderboardError::EventNotFound) => panic!("event_not_found"),
+            Err(leaderboard::LeaderboardError::Overflow) => panic!("overflow"),
         }
     }
 
