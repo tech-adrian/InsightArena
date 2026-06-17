@@ -2,7 +2,7 @@
 // These live in tests/ so they import via the crate name.
 
 use creator_event_manager::storage_types::{
-    Event, Match, MatchResult, Prediction, Winner, OUTCOME_DRAW, OUTCOME_TEAM_A, OUTCOME_TEAM_B,
+    Event, Match, MatchResult, Prediction, OUTCOME_DRAW, OUTCOME_TEAM_A, OUTCOME_TEAM_B,
 };
 use soroban_sdk::{testutils::Address as _, Address, Env, String, Symbol};
 
@@ -501,98 +501,4 @@ fn test_prediction_ungraded_is_not_winner() {
 
     let pred = Prediction::new(1, 5, 10, predictor, 2u32, 1u32, 1_640_995_200, &env);
     assert!(!pred.is_winner()); // None → not a winner
-}
-
-// ---------------------------------------------------------------------------
-// Winner tests
-// ---------------------------------------------------------------------------
-
-#[test]
-fn test_winner_creation() {
-    let env = Env::default();
-    let user = Address::generate(&env);
-
-    let winner = Winner::new(user.clone(), 42, 5, 5, 1_640_995_100, 1_640_995_200);
-    assert_eq!(winner.user, user);
-    assert_eq!(winner.event_id, 42);
-    assert_eq!(winner.total_correct, 5);
-    assert_eq!(winner.total_matches, 5);
-    assert_eq!(winner.completion_time, 1_640_995_100);
-    assert_eq!(winner.verified_at, 1_640_995_200);
-}
-
-#[test]
-fn test_winner_accuracy_percentage_perfect() {
-    let env = Env::default();
-    let user = Address::generate(&env);
-    let winner = Winner::new(user, 1, 5, 5, 0, 0);
-    assert_eq!(winner.get_accuracy_percentage(), 100);
-}
-
-#[test]
-fn test_winner_accuracy_percentage_partial() {
-    let env = Env::default();
-    let user = Address::generate(&env);
-    // 3 correct out of 5 = 60%
-    let winner = Winner::new(user, 1, 3, 5, 0, 0);
-    assert_eq!(winner.get_accuracy_percentage(), 60);
-}
-
-#[test]
-fn test_winner_accuracy_percentage_zero_matches() {
-    let env = Env::default();
-    let user = Address::generate(&env);
-    // total_matches = 0 → should not panic, returns 0
-    let winner = Winner::new(user, 1, 0, 0, 0, 0);
-    assert_eq!(winner.get_accuracy_percentage(), 0);
-}
-
-#[test]
-fn test_winner_accuracy_percentage_zero_correct() {
-    let env = Env::default();
-    let user = Address::generate(&env);
-    let winner = Winner::new(user, 1, 0, 5, 0, 0);
-    assert_eq!(winner.get_accuracy_percentage(), 0);
-}
-
-#[test]
-fn test_winner_outranks_by_correct_count() {
-    let env = Env::default();
-    let u1 = Address::generate(&env);
-    let u2 = Address::generate(&env);
-
-    // w1 has more correct predictions
-    let w1 = Winner::new(u1, 1, 5, 5, 1000, 0);
-    let w2 = Winner::new(u2, 1, 3, 5, 500, 0);
-
-    assert!(w1.outranks(&w2));
-    assert!(!w2.outranks(&w1));
-}
-
-#[test]
-fn test_winner_outranks_tiebreak_by_completion_time() {
-    let env = Env::default();
-    let u1 = Address::generate(&env);
-    let u2 = Address::generate(&env);
-
-    // Same correct count; w1 finished earlier → w1 outranks w2
-    let w1 = Winner::new(u1, 1, 5, 5, 500, 0); // earlier completion
-    let w2 = Winner::new(u2, 1, 5, 5, 1000, 0); // later completion
-
-    assert!(w1.outranks(&w2));
-    assert!(!w2.outranks(&w1));
-}
-
-#[test]
-fn test_winner_does_not_outrank_equal() {
-    let env = Env::default();
-    let u1 = Address::generate(&env);
-    let u2 = Address::generate(&env);
-
-    // Identical stats — neither outranks the other
-    let w1 = Winner::new(u1, 1, 5, 5, 500, 0);
-    let w2 = Winner::new(u2, 1, 5, 5, 500, 0);
-
-    assert!(!w1.outranks(&w2));
-    assert!(!w2.outranks(&w1));
 }

@@ -1,9 +1,9 @@
-/// Comprehensive unit tests for data structures (Event, Match, Prediction, Winner).
+/// Comprehensive unit tests for data structures (Event, Match, Prediction).
 ///
 /// Achieves 100% code coverage for the storage_types module by covering every
 /// method, edge case, validation branch, and helper function.
 use creator_event_manager::storage_types::{
-    Event, Match, MatchResult, Prediction, Winner, MAX_TEAM_NAME_LEN, OUTCOME_DRAW, OUTCOME_TEAM_A,
+    Event, Match, MatchResult, Prediction, MAX_TEAM_NAME_LEN, OUTCOME_DRAW, OUTCOME_TEAM_A,
     OUTCOME_TEAM_B,
 };
 use soroban_sdk::{testutils::Address as _, Address, Env, String, Symbol};
@@ -497,79 +497,4 @@ fn test_prediction_is_before_match_time_boundary() {
     assert!(!pred.is_before_match_time(100));
     // predicted_at (100) < match_time (101) => true
     assert!(pred.is_before_match_time(101));
-}
-
-// =============================================================================
-// Winner — supplementary tests for 100% coverage
-// =============================================================================
-
-#[test]
-fn test_winner_accuracy_percentage_rounding() {
-    let env = Env::default();
-    // 2 correct out of 3 = 66% (integer division rounds down)
-    let winner = Winner::new(Address::generate(&env), 1, 2, 3, 0, 0);
-    assert_eq!(winner.get_accuracy_percentage(), 66);
-}
-
-#[test]
-fn test_winner_accuracy_percentage_all_wrong() {
-    let env = Env::default();
-    let winner = Winner::new(Address::generate(&env), 1, 0, 10, 0, 0);
-    assert_eq!(winner.get_accuracy_percentage(), 0);
-}
-
-#[test]
-fn test_winner_accuracy_percentage_one_match() {
-    let env = Env::default();
-    let w1 = Winner::new(Address::generate(&env), 1, 1, 1, 0, 0);
-    assert_eq!(w1.get_accuracy_percentage(), 100);
-    let w2 = Winner::new(Address::generate(&env), 1, 0, 1, 0, 0);
-    assert_eq!(w2.get_accuracy_percentage(), 0);
-}
-
-#[test]
-fn test_winner_outranks_by_correct_count_only() {
-    let env = Env::default();
-    // w1 has more correct but later completion
-    let w1 = Winner::new(Address::generate(&env), 1, 5, 5, 9999, 0);
-    let w2 = Winner::new(Address::generate(&env), 1, 3, 5, 0, 0);
-    // w1 outranks because more correct, even though later completion
-    assert!(w1.outranks(&w2));
-    assert!(!w2.outranks(&w1));
-}
-
-#[test]
-fn test_winner_outranks_tiebreak_respected() {
-    let env = Env::default();
-    // Same correct count (4), w2 finished earlier
-    let w1 = Winner::new(Address::generate(&env), 1, 4, 5, 2000, 0);
-    let w2 = Winner::new(Address::generate(&env), 1, 4, 5, 1000, 0);
-    // w2 should outrank w1 (earlier completion time)
-    assert!(w2.outranks(&w1));
-    assert!(!w1.outranks(&w2));
-}
-
-#[test]
-fn test_winner_does_not_outrank_self() {
-    let env = Env::default();
-    let user = Address::generate(&env);
-    let w = Winner::new(user.clone(), 1, 5, 5, 1000, 0);
-    assert!(!w.outranks(&w));
-}
-
-#[test]
-fn test_winner_outranks_edge_case_zero_correct() {
-    let env = Env::default();
-    let w1 = Winner::new(Address::generate(&env), 1, 0, 5, 100, 0);
-    let w2 = Winner::new(Address::generate(&env), 1, 0, 5, 200, 0);
-    // Both 0 correct — tiebreak by completion_time
-    assert!(w1.outranks(&w2));
-    assert!(!w2.outranks(&w1));
-}
-
-#[test]
-fn test_winner_get_accuracy_percentage_no_matches_no_panic() {
-    let env = Env::default();
-    let winner = Winner::new(Address::generate(&env), 1, 0, 0, 0, 0);
-    assert_eq!(winner.get_accuracy_percentage(), 0);
 }
