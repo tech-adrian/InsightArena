@@ -53,6 +53,10 @@ export interface CreatorEvent {
   branding: EventBranding;
   pointsMultiplier: number;
   joined?: boolean;
+  startTime?: string;
+  rewardDistribution?: RewardDistribution;
+  category?: string;
+  bannerUrl?: string;
 }
 
 export interface CreatorEventMatch {
@@ -122,19 +126,6 @@ export interface UserPayout {
   status: PayoutStatus;
 }
 
-export interface CreateEventInput {
-  title: string;
-  description: string;
-  maxParticipants: number;
-  startsAt?: string;
-  endsAt?: string;
-  prizePool?: MoneyAmount;
-  rewardSplit?: RewardSplit[];
-  entryFee?: MoneyAmount;
-  branding?: EventBranding;
-  pointsMultiplier?: number;
-}
-
 export interface AddMatchInput {
   eventId: string;
   teamA: string;
@@ -155,6 +146,27 @@ export interface SubmitPredictionInput {
   pointsMultiplier?: number;
 }
 
+export interface RewardDistribution {
+  rank1: number;
+  rank2: number;
+  rank3: number;
+  rank4: number;
+  rank5: number;
+}
+
+export interface CreateEventInput {
+  title: string;
+  description: string;
+  maxParticipants: number;
+  startTime: string;
+  endTime: string;
+  prizePool: number;
+  rewardDistribution: RewardDistribution;
+  entryFee: number;
+  category: string;
+  bannerUrl: string;
+}
+
 export interface CreatorEventsContextValue {
   myJoinedEvents: CreatorEvent[];
   myCreatedEvents: CreatorEvent[];
@@ -163,10 +175,7 @@ export interface CreatorEventsContextValue {
   error: string | null;
 
   createEvent: (
-    input: CreateEventInput | string,
-    description?: string,
-    maxParticipants?: number,
-    details?: Partial<CreateEventInput>,
+    input: CreateEventInput,
   ) => Promise<{ eventId: string; inviteCode: string }>;
   joinEvent: (inviteCode: string) => Promise<boolean>;
   addMatch: (
@@ -843,7 +852,6 @@ export function CreatorEventsProvider({
     },
     [eventCache],
   );
-
   const getEventLeaderboard = useCallback(
     async (eventId: string) => {
       const event = eventCache[eventId];
@@ -920,36 +928,37 @@ export function CreatorEventsProvider({
     [address, eventCache, getEventLeaderboard, getEventPayouts],
   );
 
-  const createEvent = useCallback<CreatorEventsContextValue["createEvent"]>(
-    async (input, description, maxParticipants, details = {}) => {
-      const payload: CreateEventInput =
-        typeof input === "string"
-          ? {
-              title: input,
-              description: description ?? "",
-              maxParticipants: maxParticipants ?? 0,
-              ...details,
-            }
-          : input;
-
+  const createEvent = useCallback(
+    async (input: CreateEventInput): Promise<{ eventId: string; inviteCode: string }> => {
       const eventId = `event-${Date.now()}`;
-      const inviteCode = `${payload.title
+      const inviteCode = `${input.title
         .replace(/[^a-z0-9]+/gi, "-")
         .replace(/^-|-$/g, "")
         .slice(0, 12)
         .toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-      const startsAt = payload.startsAt ?? new Date().toISOString();
-      const endsAt =
-        payload.endsAt ??
-        new Date(new Date(startsAt).getTime() + 7 * DAY_IN_MS).toISOString();
-      const prizePool = payload.prizePool ?? money(0);
-      const entryFee = payload.entryFee ?? money(0, prizePool.currency);
+      const startsAt = input.startTime || new Date().toISOString();
+      const endsAt = input.endTime || new Date(new Date(startsAt).getTime() + 7 * DAY_IN_MS).toISOString();
+      const prizePoolAmount = input.prizePool || 0;
+      const entryFeeAmount = input.entryFee || 0;
+      const prizePool = money(prizePoolAmount);
+      const entryFee = money(entryFeeAmount);
+
+      const rewardSplit: RewardSplit[] = input.rewardDistribution
+        ? [
+            { rank: 1, percentage: input.rewardDistribution.rank1, label: "#1" },
+            { rank: 2, percentage: input.rewardDistribution.rank2, label: "#2" },
+            { rank: 3, percentage: input.rewardDistribution.rank3, label: "#3" },
+            { rank: 4, percentage: input.rewardDistribution.rank4, label: "#4" },
+            { rank: 5, percentage: input.rewardDistribution.rank5, label: "#5" },
+          ].filter((r) => r.percentage > 0)
+        : DEFAULT_REWARD_SPLIT;
+
       const event: CreatorEvent = {
         id: eventId,
-        title: payload.title,
-        description: payload.description,
+        title: input.title,
+        description: input.description,
         creator: address ?? "GUEST-CREATOR",
-        maxParticipants: payload.maxParticipants,
+        maxParticipants: input.maxParticipants,
         participants: 0,
         status: "Active",
         inviteCode,
@@ -959,11 +968,15 @@ export function CreatorEventsProvider({
         endsAt,
         durationDays: calculateDurationDays(startsAt, endsAt),
         prizePool,
-        rewardSplit: payload.rewardSplit ?? DEFAULT_REWARD_SPLIT,
+        rewardSplit,
         entryFee,
-        branding: payload.branding ?? DEFAULT_BRANDING,
-        pointsMultiplier: payload.pointsMultiplier ?? 1,
+        branding: DEFAULT_BRANDING,
+        pointsMultiplier: 1,
         joined: false,
+        startTime: input.startTime,
+        rewardDistribution: input.rewardDistribution,
+        category: input.category,
+        bannerUrl: input.bannerUrl,
       };
 
       setEvents((current) => [event, ...current]);
