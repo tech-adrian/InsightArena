@@ -1,0 +1,455 @@
+/// Tests for `finalize_event`: ranking, prize-pool splitting, and payout.
+///
+/// Coverage:
+/// - Top-N split paid to winners, verified against real token balances
+/// - Rejected before end_time, with unresolved matches, or when called twice
+/// - Fewer participants than reward ranks → unused percentage refunded
+/// - Zero participants → full refund to creator
+/// - Zero prize pool → no transfers, event still marked finalized
+/// - Permissionless: a random caller can finalize
+use creator_event_manager::storage;
+use creator_event_manager::storage_types::MatchResult;
+use creator_event_manager::CreatorEventManagerContractClient;
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::testutils::Ledger as _;
+use soroban_sdk::token::{StellarAssetClient, TokenClient};
+use soroban_sdk::{Address, Env, String, Symbol, Vec};
+
+const FEE: i128 = 1_000_000;
+const PRIZE: i128 = 10_000_000;
+
+fn setup() -> (
+    Env,
+    CreatorEventManagerContractClient<'static>,
+    Address,
+    Address,
+    Address,
+    Address,
+) {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(creator_event_manager::CreatorEventManagerContract, ());
+    let client = CreatorEventManagerContractClient::new(&env, &contract_id);
+    let client: CreatorEventManagerContractClient<'static> =
+        unsafe { core::mem::transmute(client) };
+
+    let admin = Address::generate(&env);
+    let ai_agent = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let xlm_token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
+
+    client.initialize(&admin, &ai_agent, &treasury, &xlm_token, &FEE);
+    (env, client, contract_id, admin, ai_agent, xlm_token)
+}
+
+fn fund(env: &Env, token: &Address, user: &Address, amount: i128) {
+    StellarAssetClient::new(env, token).mint(user, &amount);
+}
+
+fn balance(env: &Env, token: &Address, who: &Address) -> i128 {
+    TokenClient::new(env, token).balance(who)
+}
+
+fn title(env: &Env) -> String {
+    String::from_str(env, "Test Event")
+}
+
+fn desc(env: &Env) -> String {
+    String::from_str(env, "Test Description")
+}
+
+/// Create a funded event (prize_pool + reward_distribution) and `num_matches`
+/// matches. The creator is funded with exactly `FEE + prize_pool`, so after
+/// creation the creator's balance is 0 and the contract escrows the prize pool.
+fn create_funded_event(
+    env: &Env,
+    contract_id: &Address,
+    client: &CreatorEventManagerContractClient<'static>,
+    creator: &Address,
+    xlm_token: &Address,
+    prize_pool: i128,
+    reward_distribution: Vec<u32>,
+    num_matches: u32,
+) -> (u64, Symbol, Vec<u64>) {
+    fund(env, xlm_token, creator, FEE + prize_pool);
+    let start_time = env.ledger().timestamp() + 3600;
+    let end_time = env.ledger().timestamp() + 7200;
+    let (event_id, invite_code) = client.create_event(
+        creator,
+        &title(env),
+        &desc(env),
+        &100u32,
+        &start_time,
+        &end_time,
+        &prize_pool,
+        &reward_distribution,
+    );
+
+    let mut match_ids: Vec<u64> = Vec::new(env);
+
+    env.as_contract(contract_id, || {
+        for i in 0..num_matches {
+            let match_id = storage::next_match_id(env);
+            let match_record = creator_event_manager::storage_types::Match::new(
+                match_id,
+                event_id,
+                String::from_str(env, &format!("Team A{}", i)),
+                String::from_str(env, &format!("Team B{}", i)),
+                env.ledger().timestamp() + 100 + (i as u64) * 60,
+            );
+            storage::set_match(env, match_id, &match_record);
+            storage::add_event_match(env, event_id, match_id);
+            match_ids.push_back(match_id);
+
+            let mut event = storage::get_event(env, event_id).expect("event exists");
+            event.add_match();
+            storage::set_event(env, event_id, &event);
+        }
+    });
+
+    (event_id, invite_code, match_ids)
+}
+
+fn submit_result(
+    client: &CreatorEventManagerContractClient<'static>,
+    ai_agent: &Address,
+    match_id: u64,
+    result: MatchResult,
+) {
+    let (home_score, away_score) = match result {
+        MatchResult::TeamA => (1u32, 0u32),
+        MatchResult::TeamB => (0u32, 1u32),
+        MatchResult::Draw => (1u32, 1u32),
+    };
+    client.submit_match_result(ai_agent, &match_id, &home_score, &away_score);
+}
+
+fn reward_dist(env: &Env, percents: &[u32]) -> Vec<u32> {
+    let mut v = Vec::new(env);
+    for p in percents {
+        v.push_back(*p);
+    }
+    v
+}
+
+// ---------------------------------------------------------------------------
+// Happy path: top-5 split
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_finalize_event_distributes_top5_split() {
+    let (env, client, contract_id, creator, ai_agent, xlm_token) = setup();
+
+    let dist = reward_dist(&env, &[40, 30, 20, 5, 5]);
+    let (event_id, invite_code, match_ids) = create_funded_event(
+        &env,
+        &contract_id,
+        &client,
+        &creator,
+        &xlm_token,
+        PRIZE,
+        dist,
+        5,
+    );
+
+    // Contract escrows the full prize pool; creator spent everything.
+    assert_eq!(balance(&env, &xlm_token, &contract_id), PRIZE);
+    assert_eq!(balance(&env, &xlm_token, &creator), 0);
+
+    // Five participants with strictly decreasing scores (distinct ranks).
+    // Actual result for every match is TeamA (1-0). An exact 1-0 prediction is
+    // worth 4 points; a 0-1 prediction is wrong (0 points).
+    let users = [
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+    ];
+    // user i predicts correctly on the first (5 - i) matches.
+    for (i, user) in users.iter().enumerate() {
+        client.join_event(user, &invite_code);
+        let correct = 5 - i as u32;
+        for (m, match_id) in match_ids.iter().enumerate() {
+            if (m as u32) < correct {
+                client.submit_prediction(user, &match_id, &1u32, &0u32); // exact
+            } else {
+                client.submit_prediction(user, &match_id, &0u32, &1u32); // wrong
+            }
+        }
+    }
+
+    // Advance past all match times and the event end_time, then resolve.
+    env.ledger().set_timestamp(env.ledger().timestamp() + 7300);
+    for match_id in match_ids.iter() {
+        submit_result(&client, &ai_agent, match_id, MatchResult::TeamA);
+    }
+
+    // Permissionless finalize.
+    let caller = Address::generate(&env);
+    let payouts = client.finalize_event(&caller, &event_id);
+
+    // Expected per-rank amounts.
+    let expected = [
+        PRIZE * 40 / 100,
+        PRIZE * 30 / 100,
+        PRIZE * 20 / 100,
+        PRIZE * 5 / 100,
+        PRIZE * 5 / 100,
+    ];
+
+    assert_eq!(payouts.len(), 5);
+    for (i, user) in users.iter().enumerate() {
+        // Leaderboard order matches the user order (decreasing points).
+        let (addr, amount) = payouts.get(i as u32).unwrap();
+        assert_eq!(addr, *user);
+        assert_eq!(amount, expected[i]);
+        assert_eq!(balance(&env, &xlm_token, user), expected[i]);
+    }
+
+    // Full pool distributed: nothing left in the contract, nothing refunded.
+    assert_eq!(balance(&env, &xlm_token, &contract_id), 0);
+    assert_eq!(balance(&env, &xlm_token, &creator), 0);
+
+    // Event marked finalized; snapshot retrievable.
+    assert!(client.get_event(&event_id).is_finalized);
+    let snapshot = client.get_event_payouts(&event_id);
+    assert_eq!(snapshot, payouts);
+}
+
+// ---------------------------------------------------------------------------
+// Rejections
+// ---------------------------------------------------------------------------
+
+#[test]
+#[should_panic(expected = "event_not_ended")]
+fn test_finalize_event_before_end_time_rejected() {
+    let (env, client, contract_id, creator, _ai_agent, xlm_token) = setup();
+
+    let dist = reward_dist(&env, &[100]);
+    let (event_id, _invite, _matches) = create_funded_event(
+        &env,
+        &contract_id,
+        &client,
+        &creator,
+        &xlm_token,
+        PRIZE,
+        dist,
+        1,
+    );
+
+    // Time is still well before end_time (7200).
+    let caller = Address::generate(&env);
+    client.finalize_event(&caller, &event_id);
+}
+
+#[test]
+#[should_panic(expected = "matches_not_complete")]
+fn test_finalize_event_with_unresolved_match_rejected() {
+    let (env, client, contract_id, creator, ai_agent, xlm_token) = setup();
+
+    let dist = reward_dist(&env, &[100]);
+    let (event_id, invite_code, match_ids) = create_funded_event(
+        &env,
+        &contract_id,
+        &client,
+        &creator,
+        &xlm_token,
+        PRIZE,
+        dist,
+        2,
+    );
+
+    let user = Address::generate(&env);
+    client.join_event(&user, &invite_code);
+    for match_id in match_ids.iter() {
+        client.submit_prediction(&user, &match_id, &1u32, &0u32);
+    }
+
+    // Past end_time, but only resolve the first of two matches.
+    env.ledger().set_timestamp(env.ledger().timestamp() + 7300);
+    submit_result(&client, &ai_agent, match_ids.get(0).unwrap(), MatchResult::TeamA);
+
+    let caller = Address::generate(&env);
+    client.finalize_event(&caller, &event_id);
+}
+
+#[test]
+#[should_panic(expected = "already_finalized")]
+fn test_finalize_event_twice_rejected() {
+    let (env, client, contract_id, creator, ai_agent, xlm_token) = setup();
+
+    let dist = reward_dist(&env, &[100]);
+    let (event_id, invite_code, match_ids) = create_funded_event(
+        &env,
+        &contract_id,
+        &client,
+        &creator,
+        &xlm_token,
+        PRIZE,
+        dist,
+        1,
+    );
+
+    let user = Address::generate(&env);
+    client.join_event(&user, &invite_code);
+    client.submit_prediction(&user, &match_ids.get(0).unwrap(), &1u32, &0u32);
+
+    env.ledger().set_timestamp(env.ledger().timestamp() + 7300);
+    submit_result(&client, &ai_agent, match_ids.get(0).unwrap(), MatchResult::TeamA);
+
+    let caller = Address::generate(&env);
+    client.finalize_event(&caller, &event_id);
+    // Second call must be rejected.
+    client.finalize_event(&caller, &event_id);
+}
+
+// ---------------------------------------------------------------------------
+// Refund scenarios
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_finalize_event_fewer_participants_than_ranks_refunds_creator() {
+    let (env, client, contract_id, creator, ai_agent, xlm_token) = setup();
+
+    // 5 reward ranks but only 2 participants. Ranks 3-5 (5 + 5 + ... ) are
+    // unallocated and refunded to the creator.
+    let dist = reward_dist(&env, &[40, 30, 20, 5, 5]);
+    let (event_id, invite_code, match_ids) = create_funded_event(
+        &env,
+        &contract_id,
+        &client,
+        &creator,
+        &xlm_token,
+        PRIZE,
+        dist,
+        1,
+    );
+
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+    // user1 exact (4 pts), user2 wrong (0 pts) → distinct ranks.
+    client.join_event(&user1, &invite_code);
+    client.submit_prediction(&user1, &match_ids.get(0).unwrap(), &1u32, &0u32);
+    client.join_event(&user2, &invite_code);
+    client.submit_prediction(&user2, &match_ids.get(0).unwrap(), &0u32, &1u32);
+
+    env.ledger().set_timestamp(env.ledger().timestamp() + 7300);
+    submit_result(&client, &ai_agent, match_ids.get(0).unwrap(), MatchResult::TeamA);
+
+    let caller = Address::generate(&env);
+    let payouts = client.finalize_event(&caller, &event_id);
+
+    let rank1 = PRIZE * 40 / 100;
+    let rank2 = PRIZE * 30 / 100;
+    let refund = PRIZE - rank1 - rank2; // 30% (ranks 3-5) back to creator
+
+    assert_eq!(payouts.len(), 2);
+    assert_eq!(balance(&env, &xlm_token, &user1), rank1);
+    assert_eq!(balance(&env, &xlm_token, &user2), rank2);
+    assert_eq!(balance(&env, &xlm_token, &creator), refund);
+    // Nothing stranded.
+    assert_eq!(balance(&env, &xlm_token, &contract_id), 0);
+}
+
+#[test]
+fn test_finalize_event_zero_participants_refunds_full_pool() {
+    let (env, client, contract_id, creator, _ai_agent, xlm_token) = setup();
+
+    let dist = reward_dist(&env, &[60, 40]);
+    let (event_id, _invite, _matches) = create_funded_event(
+        &env,
+        &contract_id,
+        &client,
+        &creator,
+        &xlm_token,
+        PRIZE,
+        dist,
+        0,
+    );
+
+    // No participants, no matches. Past end_time.
+    env.ledger().set_timestamp(env.ledger().timestamp() + 7300);
+
+    let caller = Address::generate(&env);
+    let payouts = client.finalize_event(&caller, &event_id);
+
+    assert_eq!(payouts.len(), 0);
+    // Entire pool refunded to creator; contract empty.
+    assert_eq!(balance(&env, &xlm_token, &creator), PRIZE);
+    assert_eq!(balance(&env, &xlm_token, &contract_id), 0);
+    assert!(client.get_event(&event_id).is_finalized);
+}
+
+#[test]
+fn test_finalize_event_zero_prize_pool_noop() {
+    let (env, client, contract_id, creator, ai_agent, xlm_token) = setup();
+
+    // Fun event: zero prize pool, empty reward distribution.
+    let (event_id, invite_code, match_ids) = create_funded_event(
+        &env,
+        &contract_id,
+        &client,
+        &creator,
+        &xlm_token,
+        0,
+        Vec::new(&env),
+        1,
+    );
+
+    let user = Address::generate(&env);
+    client.join_event(&user, &invite_code);
+    client.submit_prediction(&user, &match_ids.get(0).unwrap(), &1u32, &0u32);
+
+    env.ledger().set_timestamp(env.ledger().timestamp() + 7300);
+    submit_result(&client, &ai_agent, match_ids.get(0).unwrap(), MatchResult::TeamA);
+
+    assert_eq!(balance(&env, &xlm_token, &contract_id), 0);
+
+    let caller = Address::generate(&env);
+    let payouts = client.finalize_event(&caller, &event_id);
+
+    // No reward ranks → no payouts, no transfers anywhere.
+    assert_eq!(payouts.len(), 0);
+    assert_eq!(balance(&env, &xlm_token, &contract_id), 0);
+    assert_eq!(balance(&env, &xlm_token, &creator), 0);
+    assert_eq!(balance(&env, &xlm_token, &user), 0);
+    // But the event is still marked finalized.
+    assert!(client.get_event(&event_id).is_finalized);
+}
+
+#[test]
+fn test_finalize_event_permissionless() {
+    let (env, client, contract_id, creator, ai_agent, xlm_token) = setup();
+
+    let dist = reward_dist(&env, &[100]);
+    let (event_id, invite_code, match_ids) = create_funded_event(
+        &env,
+        &contract_id,
+        &client,
+        &creator,
+        &xlm_token,
+        PRIZE,
+        dist,
+        1,
+    );
+
+    let user = Address::generate(&env);
+    client.join_event(&user, &invite_code);
+    client.submit_prediction(&user, &match_ids.get(0).unwrap(), &1u32, &0u32);
+
+    env.ledger().set_timestamp(env.ledger().timestamp() + 7300);
+    submit_result(&client, &ai_agent, match_ids.get(0).unwrap(), MatchResult::TeamA);
+
+    // A random address — neither admin nor creator — can finalize.
+    let random_caller = Address::generate(&env);
+    let payouts = client.finalize_event(&random_caller, &event_id);
+
+    assert_eq!(payouts.len(), 1);
+    assert_eq!(balance(&env, &xlm_token, &user), PRIZE);
+    assert_eq!(balance(&env, &xlm_token, &contract_id), 0);
+}

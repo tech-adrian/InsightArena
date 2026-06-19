@@ -3,6 +3,7 @@
 pub mod admin;
 mod event;
 mod fee;
+mod finalize;
 mod invite;
 mod leaderboard;
 pub mod r#match;
@@ -637,6 +638,49 @@ impl CreatorEventManagerContract {
             Err(leaderboard::LeaderboardError::EventNotFound) => panic!("event_not_found"),
             Err(leaderboard::LeaderboardError::Overflow) => panic!("overflow"),
         }
+    }
+
+    // =========================================================================
+    // Finalization / Payout
+    // =========================================================================
+
+    /// Finalize an event: rank participants, split the prize pool, and pay out.
+    ///
+    /// Permissionless — anyone may call this once the event has ended and every
+    /// match is resolved. Ranks participants via the deterministic leaderboard,
+    /// pays the top-N addresses per `reward_distribution`, refunds any
+    /// unallocated percentage and integer-division dust to the creator, marks
+    /// the event finalized, stores a payout snapshot, and emits a
+    /// `(event, finalized)` event. Returns the `(address, amount)` payout vector.
+    ///
+    /// # Panics
+    /// * `"contract_paused"` — the contract is paused.
+    /// * `"event_not_found"` — no event exists with the given ID.
+    /// * `"event_cancelled"` — the event has been cancelled.
+    /// * `"already_finalized"` — the event was already finalized.
+    /// * `"event_not_ended"` — current time is before the event's end_time.
+    /// * `"matches_not_complete"` — at least one match is unresolved.
+    /// * `"transfer_failed"` — a payout transfer failed.
+    pub fn finalize_event(env: Env, caller: Address, event_id: u64) -> Vec<(Address, i128)> {
+        match finalize::finalize_event(&env, caller, event_id) {
+            Ok(payouts) => payouts,
+            Err(EventError::Paused) => panic!("contract_paused"),
+            Err(EventError::EventNotFound) => panic!("event_not_found"),
+            Err(EventError::EventCancelled) => panic!("event_cancelled"),
+            Err(EventError::AlreadyFinalized) => panic!("already_finalized"),
+            Err(EventError::EventNotEnded) => panic!("event_not_ended"),
+            Err(EventError::MatchesNotComplete) => panic!("matches_not_complete"),
+            Err(EventError::TransferFailed) => panic!("transfer_failed"),
+            Err(_) => panic!("unexpected_error"),
+        }
+    }
+
+    /// Return the stored prize-pool payout snapshot for a finalized event.
+    ///
+    /// Returns the `(address, amount)` vector recorded by `finalize_event`, or
+    /// an empty vector if the event has not been finalized (or does not exist).
+    pub fn get_event_payouts(env: Env, event_id: u64) -> Vec<(Address, i128)> {
+        finalize::get_event_payouts(&env, event_id)
     }
 
     /// Get platform-wide statistics.

@@ -152,6 +152,10 @@ pub enum DataKey {
     /// Vec<Address> of participants for an event  (event_id)
     EventParticipants(u64),
 
+    /// Vec<(Address, i128)> snapshot of prize-pool payouts for a finalized
+    /// event  (event_id). Written once by `finalize_event`.
+    EventPayouts(u64),
+
     // ── Initialization sentinel ──────────────────────────────────────────────
     /// Set to `true` once `initialize` has been called; prevents re-init.
     Initialized,

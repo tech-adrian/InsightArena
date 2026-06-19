@@ -45,6 +45,14 @@ pub enum EventError {
     InvalidRewardDistribution = 14,
     /// Creator's XLM balance is below the requested prize_pool.
     InsufficientPrizePoolFunds = 15,
+    /// finalize_event called before the event's end_time has passed.
+    EventNotEnded = 16,
+    /// finalize_event called while at least one match is still unresolved.
+    MatchesNotComplete = 17,
+    /// finalize_event called on an event that has already been finalized.
+    AlreadyFinalized = 18,
+    /// Operation rejected because the event has been cancelled.
+    EventCancelled = 19,
 }
 
 impl From<InviteError> for EventError {
