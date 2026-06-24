@@ -61,6 +61,7 @@ describe('PredictionsService', () => {
   let mockPredictionsRepo: MockRepo<Prediction>;
   let mockMarketsRepo: MockRepo<Market>;
   let mockSoroban: jest.Mocked<SorobanService>;
+  let submitPrediction: jest.SpyInstance;
 
   beforeEach(async () => {
     const qbMock = {
@@ -87,6 +88,7 @@ describe('PredictionsService', () => {
       claimPayout: jest.fn(),
       getEvents: jest.fn(),
     } as unknown as jest.Mocked<SorobanService>;
+    submitPrediction = jest.spyOn(mockSoroban, 'submitPrediction');
 
     const mockDataSource = {
       transaction: jest.fn((cb: (manager: unknown) => Promise<Prediction>) => {
@@ -155,6 +157,7 @@ describe('PredictionsService', () => {
           makeUser(),
         ),
       ).rejects.toThrow(NotFoundException);
+      expect(submitPrediction).not.toHaveBeenCalled();
       expect(mockSoroban.submitPrediction).not.toHaveBeenCalled();
     });
 
@@ -173,6 +176,7 @@ describe('PredictionsService', () => {
           makeUser(),
         ),
       ).rejects.toThrow(BadRequestException);
+      expect(submitPrediction).not.toHaveBeenCalled();
       expect(mockSoroban.submitPrediction).not.toHaveBeenCalled();
     });
 
@@ -191,6 +195,7 @@ describe('PredictionsService', () => {
           makeUser(),
         ),
       ).rejects.toThrow(BadRequestException);
+      expect(submitPrediction).not.toHaveBeenCalled();
       expect(mockSoroban.submitPrediction).not.toHaveBeenCalled();
     });
 
@@ -209,6 +214,7 @@ describe('PredictionsService', () => {
           makeUser(),
         ),
       ).rejects.toThrow(BadRequestException);
+      expect(submitPrediction).not.toHaveBeenCalled();
       expect(mockSoroban.submitPrediction).not.toHaveBeenCalled();
     });
 
@@ -225,6 +231,7 @@ describe('PredictionsService', () => {
           makeUser(),
         ),
       ).rejects.toThrow(BadRequestException);
+      expect(submitPrediction).not.toHaveBeenCalled();
       expect(mockSoroban.submitPrediction).not.toHaveBeenCalled();
     });
 
@@ -381,6 +388,7 @@ describe('PredictionsService', () => {
       await expect(
         service.updateNote('non-existent', { note: 'Some note' }, makeUser()),
       ).rejects.toThrow(NotFoundException);
+      expect(submitPrediction).not.toHaveBeenCalled();
     });
   });
 
