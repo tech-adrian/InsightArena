@@ -1,13 +1,15 @@
-import { Controller, Get, Query, Param } from '@nestjs/common';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-  ApiParam,
-} from '@nestjs/swagger';
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Query,
+  UseInterceptors,
+} from '@nestjs/common';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { LeaderboardService } from './leaderboard.service';
-import type {
+import {
   LeaderboardQueryDto,
   LeaderboardEntryResponse,
   PaginatedLeaderboardResponse,
@@ -27,6 +29,12 @@ import { Public } from '../common/decorators/public.decorator';
 @Controller('leaderboard')
 export class LeaderboardController {
   constructor(private readonly leaderboardService: LeaderboardService) {}
+
+  async getTopLeaderboard(
+    @Param('n', ParseIntPipe) n: number,
+  ): Promise<LeaderboardEntryResponse[]> {
+    return this.leaderboardService.getTopN(n);
+  }
 
   @Get()
   @Public()
@@ -48,29 +56,6 @@ export class LeaderboardController {
     @Query() query: LeaderboardQueryDto,
   ): Promise<PaginatedLeaderboardResponse> {
     return this.leaderboardService.getLeaderboard(query);
-  }
-
-  @Get('cursor')
-  @Public()
-  @ApiOperation({
-    summary: 'Get leaderboard with cursor-based pagination (stable, cached)',
-  })
-  @ApiQuery({ name: 'cursor', required: false, type: String })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Max 100',
-  })
-  @ApiQuery({ name: 'season_id', required: false, type: String })
-  @ApiResponse({
-    status: 200,
-    description: 'Cursor-paginated leaderboard with caching for hot pages',
-  })
-  async getLeaderboardCursor(
-    @Query() query: CursorPaginationDto,
-  ): Promise<PaginatedCursorResponse> {
-    return this.leaderboardService.getLeaderboardCursor(query);
   }
 
   @Get('history')

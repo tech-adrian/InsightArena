@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { LeaderboardController } from './leaderboard.controller';
 import { LeaderboardService } from './leaderboard.service';
 import {
+  LeaderboardEntryResponse,
   LeaderboardQueryDto,
   PaginatedLeaderboardResponse,
 } from './dto/leaderboard-query.dto';
@@ -35,6 +36,7 @@ describe('LeaderboardController', () => {
         {
           provide: LeaderboardService,
           useValue: {
+            getTopLeaderboard: jest.fn(),
             getLeaderboard: jest.fn(),
             getUserRank: jest.fn(),
             getHistory: jest.fn(),
@@ -80,6 +82,20 @@ describe('LeaderboardController', () => {
       expect(spy).toHaveBeenCalledWith(
         expect.objectContaining({ season_id: 'season-1' }),
       );
+    });
+  });
+
+  describe('getTopLeaderboard', () => {
+    it('should return top N leaderboard entries', async () => {
+      const mockTop: LeaderboardEntryResponse[] = [mockResponse.data[0]];
+      const spy = jest
+        .spyOn(service, 'getTopLeaderboard')
+        .mockResolvedValue(mockTop);
+
+      const result = await controller.getTopLeaderboard(1);
+
+      expect(spy).toHaveBeenCalledWith(1);
+      expect(result).toEqual(mockTop);
     });
   });
 
