@@ -63,9 +63,17 @@ describe('PredictionsService', () => {
   let mockMarketsRepo: MockRepo<Market>;
   let mockSoroban: jest.Mocked<SorobanService>;
   let submitPrediction: jest.SpyInstance;
+  let qbMock: {
+    update: jest.Mock;
+    set: jest.Mock;
+    setParameters: jest.Mock;
+    where: jest.Mock;
+    setParameter: jest.Mock;
+    execute: jest.Mock;
+  };
 
   beforeEach(async () => {
-    const qbMock = {
+    qbMock = {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       setParameters: jest.fn().mockReturnThis(),

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { LeaderboardController } from './leaderboard.controller';
 import { LeaderboardService } from './leaderboard.service';
 import {
@@ -33,6 +34,14 @@ describe('LeaderboardController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [LeaderboardController],
       providers: [
+        {
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+          },
+        },
         {
           provide: LeaderboardService,
           useValue: {
