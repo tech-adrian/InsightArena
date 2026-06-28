@@ -781,3 +781,27 @@ fn test_create_season_before_previous_starts_succeeds() {
     let season2_id = client.create_season(&admin, &100, &200, &100_000_000);
     assert_eq!(season2_id, 2);
 }
+
+#[test]
+fn test_create_season_overlapping_finalized_season_succeeds() {
+    let env = Env::default();
+    let (client, xlm_token, admin, _oracle) = deploy(&env);
+
+    fund(&env, &xlm_token, &admin, 300_000_000);
+    approve_reward_pool(&env, &xlm_token, &admin, &client.address, 300_000_000);
+
+    let season1_id = client.create_season(&admin, &100, &200, &100_000_000);
+    assert_eq!(season1_id, 1);
+
+    let result = client.try_create_season(&admin, &150, &250, &100_000_000);
+    assert_eq!(result, Err(Ok(InsightArenaError::SeasonOverlap)));
+
+    client.update_leaderboard(&admin, &season1_id, &sample_entries(&env));
+
+    env.ledger().set_timestamp(200);
+    client.finalize_season(&admin, &season1_id);
+
+    let season2_id = client.create_season(&admin, &150, &250, &100_000_000);
+    assert_eq!(season2_id, 2);
+}
+
