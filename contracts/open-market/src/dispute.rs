@@ -112,6 +112,10 @@ pub fn raise_dispute(
 
     bump_dispute(&env, market_id);
 
+    // Increment open dispute count
+    let current_count = get_open_dispute_count(&env);
+    set_open_dispute_count(&env, current_count + 1);
+
     // Update creator's dispute count and reputation
     reputation::on_dispute_raised(&env, &market.creator);
 
@@ -173,6 +177,12 @@ pub fn resolve_dispute(
         .persistent()
         .remove(&DataKey::Dispute(market_id));
 
+    // Decrement open dispute count
+    let current_count = get_open_dispute_count(&env);
+    if current_count > 0 {
+        set_open_dispute_count(&env, current_count - 1);
+    }
+
     emit_dispute_resolved(&env, market_id, &admin, uphold);
 
     Ok(())
@@ -188,4 +198,22 @@ pub fn list_active_disputes(env: &Env) -> Vec<u64> {
         bump_active_dispute_list(env);
     }
     list
+}
+
+pub fn get_open_dispute_count(env: &Env) -> u32 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::DisputeCount)
+        .unwrap_or(0)
+}
+
+fn set_open_dispute_count(env: &Env, count: u32) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::DisputeCount, &count);
+    env.storage().persistent().extend_ttl(
+        &DataKey::DisputeCount,
+        config::PERSISTENT_THRESHOLD,
+        config::PERSISTENT_BUMP,
+    );
 }

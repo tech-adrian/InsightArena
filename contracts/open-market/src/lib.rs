@@ -257,6 +257,11 @@ impl InsightArenaContract {
         dispute::list_active_disputes(&env)
     }
 
+    /// Get the total count of currently open disputes.
+    pub fn get_open_dispute_count(env: Env) -> u32 {
+        dispute::get_open_dispute_count(&env)
+    }
+
     // ── Prediction ────────────────────────────────────────────────────────────
 
     /// Submit a prediction for an open market by staking XLM on a chosen outcome.

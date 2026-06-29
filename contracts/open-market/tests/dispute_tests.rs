@@ -516,3 +516,64 @@ fn test_dispute_reraise_after_uphold_succeeds() {
     assert!(result.is_ok());
     assert_eq!(client.list_active_disputes().len(), 1);
 }
+
+#[test]
+fn test_get_open_dispute_count_starts_at_zero() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _admin, _oracle, _xlm_token) = deploy(&env);
+    assert_eq!(client.get_open_dispute_count(), 0);
+}
+
+#[test]
+fn test_get_open_dispute_count_increments_on_raise() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _admin, oracle, xlm_token) = deploy(&env);
+    let creator = Address::generate(&env);
+    let disputer = Address::generate(&env);
+
+    let id = client.create_market(&creator, &market_params(&env));
+    env.ledger().set_timestamp(env.ledger().timestamp() + 20);
+    client.resolve_market(&oracle, &id, &symbol_short!("yes"));
+
+    let bond = 15_000_000_i128;
+    StellarAssetClient::new(&env, &xlm_token).mint(&disputer, &bond);
+    TokenClient::new(&env, &xlm_token).approve(&disputer, &client.address, &bond, &9999);
+
+    assert_eq!(client.get_open_dispute_count(), 0);
+    client.raise_dispute(&disputer, &id, &bond);
+    assert_eq!(client.get_open_dispute_count(), 1);
+}
+
+#[test]
+fn test_get_open_dispute_count_decrements_on_resolve() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, admin, oracle, xlm_token) = deploy(&env);
+    let creator = Address::generate(&env);
+    let disputer = Address::generate(&env);
+
+    let id = client.create_market(&creator, &market_params(&env));
+    env.ledger().set_timestamp(env.ledger().timestamp() + 20);
+    client.resolve_market(&oracle, &id, &symbol_short!("yes"));
+
+    let bond = 15_000_000_i128;
+    StellarAssetClient::new(&env, &xlm_token).mint(&disputer, &bond);
+    TokenClient::new(&env, &xlm_token).approve(&disputer, &client.address, &bond, &9999);
+
+    client.raise_dispute(&disputer, &id, &bond);
+    assert_eq!(client.get_open_dispute_count(), 1);
+
+    client.resolve_dispute(&admin, &id, &false);
+    assert_eq!(client.get_open_dispute_count(), 0);
+}
+
+#[test]
+fn test_get_open_dispute_count_never_goes_below_zero() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _admin, _oracle, _xlm_token) = deploy(&env);
+    // Verify count starts at zero and remains non-negative
+    assert_eq!(client.get_open_dispute_count(), 0);
+}

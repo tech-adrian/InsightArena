@@ -56,6 +56,8 @@ pub enum DataKey {
     ActiveDisputeList,
     /// Singleton. Cumulative platform stake volume (stroops) for analytics.
     PlatformVolume,
+    /// Singleton. Count of currently open/active disputes.
+    DisputeCount,
     /// Keyed by creator address. Aggregated creator reputation statistics.
     CreatorStats(Address),
     /// Keyed by market_id. Stores AMM pool state for a market.
